@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import apiClient from '../api/client'
+import { getTeams, createTeam, CS2Team, getPlayers, createPlayer, CS2Player, registerMatchStats } from '../api/players'
 
 interface User {
   id: string
@@ -438,6 +439,410 @@ function InvitesSection() {
   )
 }
 
+function TeamsSection() {
+  const [teams, setTeams] = useState<CS2Team[]>([])
+  const [name, setName] = useState('')
+  const [logoUrl, setLogoUrl] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+
+  function loadTeams() {
+    getTeams()
+      .then(setTeams)
+      .catch(() => {})
+  }
+
+  useEffect(() => { loadTeams() }, [])
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setSubmitting(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await createTeam({ name, logoUrl: logoUrl || undefined })
+      setSuccess('Time cadastrado com sucesso!')
+      setName('')
+      setLogoUrl('')
+      loadTeams()
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: { message?: string } } } }
+      setError(axiosErr.response?.data?.error?.message ?? 'Erro ao cadastrar time.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <section>
+      <h2>Times</h2>
+      <div className="card">
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="teamName">Nome:</label>
+            <input
+              id="teamName"
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="teamLogoUrl">URL do Logo (opcional):</label>
+            <input
+              id="teamLogoUrl"
+              type="text"
+              value={logoUrl}
+              onChange={e => setLogoUrl(e.target.value)}
+            />
+          </div>
+          <button type="submit" disabled={submitting}>
+            {submitting ? 'Cadastrando...' : 'Cadastrar Time'}
+          </button>
+          {success && <p role="status">{success}</p>}
+          {error && <p role="alert">{error}</p>}
+        </form>
+      </div>
+      {teams.length > 0 && (
+        <div className="card" style={{ padding: 0, overflow: 'hidden', marginTop: '1rem' }}>
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Logo</th>
+                <th>Criado em</th>
+              </tr>
+            </thead>
+            <tbody>
+              {teams.map(team => (
+                <tr key={team.id}>
+                  <td>{team.name}</td>
+                  <td>
+                    {team.logoUrl
+                      ? <img src={team.logoUrl} alt={team.name} style={{ height: '2rem' }} />
+                      : '—'}
+                  </td>
+                  <td>{new Date(team.createdAt).toLocaleString('pt-BR')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function PlayersSection() {
+  const [players, setPlayers] = useState<CS2Player[]>([])
+  const [teams, setTeams] = useState<CS2Team[]>([])
+  const [nickname, setNickname] = useState('')
+  const [realName, setRealName] = useState('')
+  const [teamId, setTeamId] = useState('')
+  const [photoUrl, setPhotoUrl] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+
+  function loadPlayers() {
+    getPlayers()
+      .then(setPlayers)
+      .catch(() => {})
+  }
+
+  useEffect(() => {
+    loadPlayers()
+    getTeams()
+      .then(setTeams)
+      .catch(() => {})
+  }, [])
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setSubmitting(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await createPlayer({
+        nickname,
+        realName: realName || undefined,
+        teamId,
+        photoUrl: photoUrl || undefined,
+      })
+      setSuccess('Jogador cadastrado com sucesso!')
+      setNickname('')
+      setRealName('')
+      setTeamId('')
+      setPhotoUrl('')
+      loadPlayers()
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: { message?: string } } } }
+      setError(axiosErr.response?.data?.error?.message ?? 'Erro ao cadastrar jogador.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <section>
+      <h2>Jogadores</h2>
+      <div className="card">
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="playerNickname">Nickname:</label>
+            <input
+              id="playerNickname"
+              type="text"
+              value={nickname}
+              onChange={e => setNickname(e.target.value)}
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="playerRealName">Nome Real (opcional):</label>
+            <input
+              id="playerRealName"
+              type="text"
+              value={realName}
+              onChange={e => setRealName(e.target.value)}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="playerTeamId">Time:</label>
+            <select
+              id="playerTeamId"
+              value={teamId}
+              onChange={e => setTeamId(e.target.value)}
+              required
+            >
+              <option value="">Selecione um time</option>
+              {teams.map(team => (
+                <option key={team.id} value={team.id}>{team.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="playerPhotoUrl">URL da Foto (opcional):</label>
+            <input
+              id="playerPhotoUrl"
+              type="text"
+              value={photoUrl}
+              onChange={e => setPhotoUrl(e.target.value)}
+            />
+          </div>
+          <button type="submit" disabled={submitting}>
+            {submitting ? 'Cadastrando...' : 'Cadastrar Jogador'}
+          </button>
+          {success && <p role="status">{success}</p>}
+          {error && <p role="alert">{error}</p>}
+        </form>
+      </div>
+      {players.length > 0 && (
+        <div className="card" style={{ padding: 0, overflow: 'hidden', marginTop: '1rem' }}>
+          <table>
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Time</th>
+                <th>Score Atual</th>
+                <th>Partidas</th>
+              </tr>
+            </thead>
+            <tbody>
+              {players.map(player => (
+                <tr key={player.id}>
+                  <td>{player.nickname}</td>
+                  <td>{player.teamName}</td>
+                  <td>{player.playerScore}</td>
+                  <td>{player.matchesCount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function MatchStatsSection() {
+  const [games, setGames] = useState<Game[]>([])
+  const [players, setPlayers] = useState<CS2Player[]>([])
+  const [gameId, setGameId] = useState('')
+  const [playerId, setPlayerId] = useState('')
+  const [kills, setKills] = useState('0')
+  const [deaths, setDeaths] = useState('0')
+  const [assists, setAssists] = useState('0')
+  const [totalDamage, setTotalDamage] = useState('0')
+  const [rounds, setRounds] = useState('1')
+  const [kastPercent, setKastPercent] = useState('0')
+  const [submitting, setSubmitting] = useState(false)
+  const [success, setSuccess] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    apiClient.get<Game[]>('/games')
+      .then(res => setGames(res.data))
+      .catch(() => {})
+    getPlayers()
+      .then(setPlayers)
+      .catch(() => {})
+  }, [])
+
+  const eligibleGames = games.filter(g => g.status === 'InProgress' || g.status === 'Finished')
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!gameId || !playerId) return
+    setSubmitting(true)
+    setSuccess(null)
+    setError(null)
+    try {
+      await registerMatchStats(playerId, {
+        gameId,
+        kills: parseInt(kills, 10),
+        deaths: parseInt(deaths, 10),
+        assists: parseInt(assists, 10),
+        totalDamage: parseFloat(totalDamage),
+        rounds: parseInt(rounds, 10),
+        kastPercent: parseFloat(kastPercent),
+      })
+      setSuccess('Estatísticas registradas com sucesso!')
+      setGameId('')
+      setPlayerId('')
+      setKills('0')
+      setDeaths('0')
+      setAssists('0')
+      setTotalDamage('0')
+      setRounds('1')
+      setKastPercent('0')
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: { message?: string } } } }
+      setError(axiosErr.response?.data?.error?.message ?? 'Erro ao registrar estatísticas.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <section>
+      <h2>Estatísticas de Partida</h2>
+      <div className="card">
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="statsGameSelect">Jogo:</label>
+            <select
+              id="statsGameSelect"
+              value={gameId}
+              onChange={e => setGameId(e.target.value)}
+              required
+            >
+              <option value="">Selecione um jogo</option>
+              {eligibleGames.map(game => (
+                <option key={game.id} value={game.id}>
+                  {game.teamA} vs {game.teamB} — {game.status === 'InProgress' ? 'Em andamento' : 'Finalizado'}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="statsPlayerSelect">Jogador:</label>
+            <select
+              id="statsPlayerSelect"
+              value={playerId}
+              onChange={e => setPlayerId(e.target.value)}
+              required
+            >
+              <option value="">Selecione um jogador</option>
+              {players.map(player => (
+                <option key={player.id} value={player.id}>
+                  {player.nickname} — {player.teamName}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="statsKills">Kills:</label>
+            <input
+              id="statsKills"
+              type="number"
+              min="0"
+              value={kills}
+              onChange={e => setKills(e.target.value)}
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="statsDeaths">Deaths:</label>
+            <input
+              id="statsDeaths"
+              type="number"
+              min="0"
+              value={deaths}
+              onChange={e => setDeaths(e.target.value)}
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="statsAssists">Assists:</label>
+            <input
+              id="statsAssists"
+              type="number"
+              min="0"
+              value={assists}
+              onChange={e => setAssists(e.target.value)}
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="statsTotalDamage">Dano Total:</label>
+            <input
+              id="statsTotalDamage"
+              type="number"
+              min="0"
+              step="0.1"
+              value={totalDamage}
+              onChange={e => setTotalDamage(e.target.value)}
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="statsRounds">Rounds:</label>
+            <input
+              id="statsRounds"
+              type="number"
+              min="1"
+              value={rounds}
+              onChange={e => setRounds(e.target.value)}
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="statsKastPercent">KAST (%):</label>
+            <input
+              id="statsKastPercent"
+              type="number"
+              min="0"
+              max="100"
+              step="0.1"
+              value={kastPercent}
+              onChange={e => setKastPercent(e.target.value)}
+              required
+            />
+          </div>
+          <button type="submit" disabled={submitting}>
+            {submitting ? 'Registrando...' : 'Registrar Estatísticas'}
+          </button>
+          {success && <p role="status">{success}</p>}
+          {error && <p role="alert">{error}</p>}
+        </form>
+      </div>
+    </section>
+  )
+}
+
 export default function AdminPage() {
   const [user, setUser] = useState<User | null>(null)
   const [games, setGames] = useState<Game[]>([])
@@ -474,6 +879,9 @@ export default function AdminPage() {
       <StartGameSection games={games} onStarted={loadGames} />
       <RegisterResultSection games={games} />
       <InvitesSection />
+      <TeamsSection />
+      <PlayersSection />
+      <MatchStatsSection />
     </div>
   )
 }

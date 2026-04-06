@@ -70,6 +70,7 @@ function BetCard({ bet, onCancel }: { bet: Bet; onCancel: (id: string) => void }
         <span><strong>Mercado:</strong> {marketLabel(bet.market)}</span>
         <span><strong>Opção:</strong> {bet.creatorOption}</span>
         <span><strong>Valor:</strong> 🪙 {bet.amount}</span>
+        {bet.coveredById && <span><strong>Contraparte:</strong> {bet.coveredById}</span>}
         <span className={`badge ${STATUS_BADGE[bet.status] ?? ''}`}>{STATUS_LABELS[bet.status] ?? bet.status}</span>
       </div>
       <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>

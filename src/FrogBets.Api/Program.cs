@@ -33,6 +33,15 @@ builder.Services.AddScoped<ISettlementService, SettlementService>();
 // Invite service
 builder.Services.AddScoped<IInviteService, InviteService>();
 
+// Team service
+builder.Services.AddScoped<ITeamService, TeamService>();
+
+// Player service
+builder.Services.AddScoped<IPlayerService, PlayerService>();
+
+// Match stats service
+builder.Services.AddScoped<IMatchStatsService, MatchStatsService>();
+
 // JWT Bearer authentication
 var jwtSection = builder.Configuration.GetSection("Jwt");
 var key = Encoding.UTF8.GetBytes(jwtSection["Key"]!);

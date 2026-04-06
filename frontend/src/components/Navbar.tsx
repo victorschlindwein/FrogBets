@@ -32,6 +32,7 @@ export default function Navbar() {
       <Link to="/bets">Minhas Apostas</Link>
       <Link to="/marketplace">Marketplace</Link>
       <Link to="/leaderboard">Ranking</Link>
+      <Link to="/players/ranking">Ranking CS2</Link>
       {me?.isAdmin && <Link to="/admin">Admin</Link>}
       <span className="nav-spacer" />
       <span className="nav-user">{me?.username}</span>

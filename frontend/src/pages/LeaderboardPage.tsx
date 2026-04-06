@@ -33,9 +33,9 @@ export default function LeaderboardPage() {
           <table>
             <thead>
               <tr>
-                <th>#</th>
+                <th>Posição</th>
                 <th>Usuário</th>
-                <th>Saldo</th>
+                <th>Saldo Virtual</th>
                 <th>Vitórias</th>
                 <th>Derrotas</th>
               </tr>
@@ -44,8 +44,8 @@ export default function LeaderboardPage() {
               {entries.map((entry, index) => (
                 <tr key={entry.username}>
                   <td><strong>{index + 1}</strong></td>
-                  <td>{index === 0 ? '🥇 ' : index === 1 ? '🥈 ' : index === 2 ? '🥉 ' : ''}{entry.username}</td>
-                  <td>🪙 {entry.virtualBalance.toLocaleString('pt-BR')}</td>
+                  <td>{index === 0 ? '🥇 ' : index === 1 ? '🥈 ' : index === 2 ? '🥉 ' : ''}<span>{entry.username}</span></td>
+                  <td>🪙 <span>{entry.virtualBalance}</span></td>
                   <td style={{ color: 'var(--green)' }}>{entry.winsCount}</td>
                   <td style={{ color: 'var(--danger)' }}>{entry.lossesCount}</td>
                 </tr>

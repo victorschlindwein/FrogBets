@@ -15,6 +15,9 @@ public class FrogBetsDbContext : DbContext
     public DbSet<GameResult> GameResults => Set<GameResult>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Invite> Invites => Set<Invite>();
+    public DbSet<CS2Team> CS2Teams => Set<CS2Team>();
+    public DbSet<CS2Player> CS2Players => Set<CS2Player>();
+    public DbSet<MatchStats> MatchStats => Set<MatchStats>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -146,6 +149,48 @@ public class FrogBetsDbContext : DbContext
             e.HasOne(i => i.UsedByUser)
                 .WithMany()
                 .HasForeignKey(i => i.UsedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // CS2Team
+        modelBuilder.Entity<CS2Team>(e =>
+        {
+            e.HasKey(t => t.Id);
+            e.Property(t => t.Name).IsRequired().HasMaxLength(100);
+            e.HasIndex(t => t.Name).IsUnique();
+            e.Property(t => t.CreatedAt).IsRequired();
+
+            e.HasMany(t => t.Players)
+                .WithOne(p => p.Team)
+                .HasForeignKey(p => p.TeamId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // CS2Player
+        modelBuilder.Entity<CS2Player>(e =>
+        {
+            e.HasKey(p => p.Id);
+            e.Property(p => p.Nickname).IsRequired().HasMaxLength(100);
+            e.HasIndex(p => p.Nickname).IsUnique();
+            e.Property(p => p.PlayerScore).HasDefaultValue(0.0);
+            e.Property(p => p.CreatedAt).IsRequired();
+
+            e.HasMany(p => p.Stats)
+                .WithOne(s => s.Player)
+                .HasForeignKey(s => s.PlayerId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // MatchStats
+        modelBuilder.Entity<MatchStats>(e =>
+        {
+            e.HasKey(s => s.Id);
+            e.HasIndex(s => new { s.PlayerId, s.GameId }).IsUnique();
+            e.Property(s => s.CreatedAt).IsRequired();
+
+            e.HasOne(s => s.Game)
+                .WithMany()
+                .HasForeignKey(s => s.GameId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }

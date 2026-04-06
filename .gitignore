@@ -1,0 +1,29 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.log
+
+# EF Core
+*.db
+*.db-shm
+*.db-wal
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Kiro tools
+tools/SeedAdmin/
+
+# Env / secrets
+appsettings.Development.json
+*.env
+.env*
+
+# OS
+.DS_Store
+Thumbs.db

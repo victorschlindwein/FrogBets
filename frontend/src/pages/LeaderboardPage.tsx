@@ -20,14 +20,14 @@ export default function LeaderboardPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <div className="page"><p>Carregando classificação...</p></div>
+  if (loading) return <div className="page"><div className="card empty-card"><p>Carregando classificação...</p></div></div>
 
   return (
     <div className="page">
-      <h1>🏆 Classificação</h1>
+      <h1>🏆 Ranking Apostas</h1>
       {error && <p role="alert">{error}</p>}
       {entries.length === 0 ? (
-        <p>Nenhum usuário encontrado.</p>
+        <div className="card empty-card"><p>Nenhum usuário encontrado.</p></div>
       ) : (
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           <table>

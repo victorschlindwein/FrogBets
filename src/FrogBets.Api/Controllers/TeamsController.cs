@@ -40,9 +40,9 @@ public class TeamsController : ControllerBase
         }
     }
 
-    /// <summary>GET /api/teams — any authenticated user: list all teams.</summary>
+    /// <summary>GET /api/teams — lista todos os times (público).</summary>
     [HttpGet]
-    [Authorize]
+    [AllowAnonymous]
     public async Task<IActionResult> GetTeams()
     {
         var teams = await _teamService.GetTeamsAsync();

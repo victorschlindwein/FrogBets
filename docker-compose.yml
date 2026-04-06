@@ -29,6 +29,7 @@ services:
       Jwt__Issuer: FrogBets
       Jwt__Audience: FrogBets
       Jwt__ExpirationMinutes: 60
+      AllowedOrigins: ${ALLOWED_ORIGINS}
     ports:
       - "8080:8080"
 

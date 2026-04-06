@@ -31,7 +31,7 @@ export default function Navbar() {
       <Link to="/games">Jogos</Link>
       <Link to="/bets">Minhas Apostas</Link>
       <Link to="/marketplace">Marketplace</Link>
-      <Link to="/leaderboard">Ranking</Link>
+      <Link to="/leaderboard">Ranking Apostas</Link>
       <Link to="/players/ranking">Ranking CS2</Link>
       {me?.isAdmin && <Link to="/admin">Admin</Link>}
       <span className="nav-spacer" />

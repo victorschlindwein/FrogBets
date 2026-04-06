@@ -20,6 +20,7 @@ public class FrogBetsDbContext : DbContext
     public DbSet<MatchStats> MatchStats => Set<MatchStats>();
     public DbSet<TradeListing> TradeListings => Set<TradeListing>();
     public DbSet<TradeOffer> TradeOffers => Set<TradeOffer>();
+    public DbSet<RevokedToken> RevokedTokens => Set<RevokedToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -247,6 +248,14 @@ public class FrogBetsDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(o => o.ReceiverTeamId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // RevokedToken
+        modelBuilder.Entity<RevokedToken>(e =>
+        {
+            e.HasKey(r => r.Jti);
+            e.Property(r => r.Jti).HasMaxLength(128);
+            e.HasIndex(r => r.ExpiresAt); // para limpeza periódica
         });
     }
 }

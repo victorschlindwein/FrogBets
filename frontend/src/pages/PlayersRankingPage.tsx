@@ -13,14 +13,14 @@ export default function PlayersRankingPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <div className="page"><p>Carregando ranking...</p></div>
+  if (loading) return <div className="page"><div className="card empty-card"><p>Carregando ranking...</p></div></div>
 
   return (
     <div className="page">
       <h1>🎮 Ranking CS2</h1>
       {error && <p role="alert">{error}</p>}
       {ranking.length === 0 ? (
-        <p>Nenhum jogador encontrado.</p>
+        <div className="card empty-card"><p>Nenhum jogador encontrado.</p></div>
       ) : (
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           <table>

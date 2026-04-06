@@ -105,7 +105,7 @@ export default function BetsPage() {
   const active = bets.filter(b => b.status === 'Active')
   const settled = bets.filter(b => b.status === 'Settled' || b.status === 'Voided' || b.status === 'Cancelled')
 
-  if (loading) return <div className="page"><p>Carregando apostas...</p></div>
+  if (loading) return <div className="page"><p className="empty-state">Carregando apostas...</p></div>
 
   return (
     <div className="page">
@@ -114,23 +114,26 @@ export default function BetsPage() {
 
       <section>
         <h2>Pendentes</h2>
-        {pending.length === 0 ? <p>Nenhuma aposta pendente.</p> : (
-          <ul className="bet-list">{pending.map(bet => <BetCard key={bet.id} bet={bet} onCancel={handleCancel} />)}</ul>
-        )}
+        {pending.length === 0
+          ? <div className="card empty-card"><p>Nenhuma aposta pendente.</p></div>
+          : <ul className="bet-list">{pending.map(bet => <BetCard key={bet.id} bet={bet} onCancel={handleCancel} />)}</ul>
+        }
       </section>
 
       <section>
         <h2>Ativas</h2>
-        {active.length === 0 ? <p>Nenhuma aposta ativa.</p> : (
-          <ul className="bet-list">{active.map(bet => <BetCard key={bet.id} bet={bet} onCancel={handleCancel} />)}</ul>
-        )}
+        {active.length === 0
+          ? <div className="card empty-card"><p>Nenhuma aposta ativa.</p></div>
+          : <ul className="bet-list">{active.map(bet => <BetCard key={bet.id} bet={bet} onCancel={handleCancel} />)}</ul>
+        }
       </section>
 
       <section>
         <h2>Liquidadas / Encerradas</h2>
-        {settled.length === 0 ? <p>Nenhuma aposta liquidada.</p> : (
-          <ul className="bet-list">{settled.map(bet => <BetCard key={bet.id} bet={bet} onCancel={handleCancel} />)}</ul>
-        )}
+        {settled.length === 0
+          ? <div className="card empty-card"><p>Nenhuma aposta liquidada.</p></div>
+          : <ul className="bet-list">{settled.map(bet => <BetCard key={bet.id} bet={bet} onCancel={handleCancel} />)}</ul>
+        }
       </section>
     </div>
   )

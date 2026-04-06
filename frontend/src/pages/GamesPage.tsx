@@ -35,14 +35,14 @@ export default function GamesPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <div className="page"><p>Carregando jogos...</p></div>
+  if (loading) return <div className="page"><div className="card empty-card"><p>Carregando jogos...</p></div></div>
 
   return (
     <div className="page">
       <h1>Jogos</h1>
       {error && <p role="alert">{error}</p>}
       {games.length === 0 ? (
-        <p>Nenhum jogo disponível.</p>
+        <div className="card empty-card"><p>Nenhum jogo disponível.</p></div>
       ) : (
         <ul className="game-list">
           {games.map(game => (

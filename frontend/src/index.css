@@ -39,11 +39,16 @@ p { line-height: 1.6; }
 .page {
   max-width: 960px;
   margin: 2rem auto;
-  padding: 0 1.25rem;
+  padding: 4rem 1.25rem 0; /* 4rem = altura da navbar fixa */
 }
 
-/* ── Navbar ──────────────────────────────────────────────────────────────── */
+/* ── Navbar (fixa no topo) ───────────────────────────────────────────────── */
 nav.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
   background: var(--green-dark);
   padding: .75rem 1.5rem;
   display: flex;
@@ -336,3 +341,70 @@ tr:hover td { background: #f5f0e8; }
 
 /* ── Section spacing ─────────────────────────────────────────────────────── */
 section + section { margin-top: 2rem; }
+
+/* ── Empty state card ────────────────────────────────────────────────────── */
+.empty-card {
+  color: var(--text-muted);
+  font-size: .95rem;
+  text-align: center;
+  padding: 1.5rem;
+  border: 1.5px dashed var(--sand);
+  background: var(--cream);
+}
+
+/* ── Admin index nav (flutuante lateral direita, translúcido) ────────────── */
+.admin-index {
+  position: fixed;
+  top: 4.5rem;   /* abaixo da navbar fixa */
+  right: 1.25rem;
+  z-index: 100;
+  width: 190px;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(216, 201, 167, 0.6);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 16px rgba(0,0,0,.1);
+  padding: .9rem 1rem;
+  margin-bottom: 0;
+}
+
+.admin-index strong {
+  display: block;
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--text-muted);
+  margin-bottom: .55rem;
+}
+
+.admin-index ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: .1rem;
+}
+
+.admin-index ul li a {
+  display: block;
+  font-size: .8rem;
+  color: var(--green-dark);
+  font-weight: 500;
+  padding: .3rem .45rem;
+  border-radius: calc(var(--radius) - 2px);
+  transition: background .15s, color .15s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-index ul li a:hover {
+  background: rgba(92, 111, 43, 0.1);
+  color: var(--orange);
+  text-decoration: none;
+}
+
+/* Página admin centralizada normalmente, sem margin extra */
+.page-admin {
+  margin-left: auto;
+}

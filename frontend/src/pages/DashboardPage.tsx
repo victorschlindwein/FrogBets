@@ -20,6 +20,7 @@ export default function DashboardPage() {
     <div className="page">
       <h1>Dashboard</h1>
       {error && <p role="alert">{error}</p>}
+      {!balance && !error && <div className="card empty-card"><p>Carregando saldo...</p></div>}
       {balance && (
         <div className="stats-grid">
           <div className="stat-card">

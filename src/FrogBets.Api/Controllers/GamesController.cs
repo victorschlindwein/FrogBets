@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using FrogBets.Api.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -105,5 +106,10 @@ public class GamesController : ControllerBase
     }
 }
 
-public record CreateGameBody(string TeamA, string TeamB, DateTime ScheduledAt, int NumberOfMaps);
-public record RegisterResultBody(Guid MarketId, string WinningOption, int? MapNumber);
+public record CreateGameBody(
+    [Required][StringLength(100, MinimumLength = 1)] string TeamA,
+    [Required][StringLength(100, MinimumLength = 1)] string TeamB,
+    [Required] DateTime ScheduledAt,
+    [Range(1, 5)] int NumberOfMaps
+);
+public record RegisterResultBody([Required] Guid MarketId, [Required][StringLength(200, MinimumLength = 1)] string WinningOption, int? MapNumber);

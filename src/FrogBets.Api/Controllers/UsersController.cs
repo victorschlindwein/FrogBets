@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using FrogBets.Api.Services;
 using FrogBets.Domain.Entities;
@@ -150,6 +151,9 @@ public class UsersController : ControllerBase
     }
 }
 
-public record RegisterRequest(string Username, string Password);
+public record RegisterRequest(
+    [Required][StringLength(50, MinimumLength = 3)] string Username,
+    [Required][StringLength(200, MinimumLength = 8)] string Password
+);
 
 public record MoveUserTeamBody(Guid? TeamId);

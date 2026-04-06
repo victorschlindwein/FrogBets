@@ -37,4 +37,11 @@ apiClient.interceptors.response.use(
   }
 )
 
+// Cliente sem interceptor de redirecionamento — para endpoints públicos
+// acessados em páginas que não requerem autenticação (ex: /register)
+export const publicClient = axios.create({
+  baseURL: '/api',
+  headers: { 'Content-Type': 'application/json' }
+})
+
 export default apiClient

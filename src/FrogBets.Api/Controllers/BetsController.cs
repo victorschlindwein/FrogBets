@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using FrogBets.Api.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -146,4 +147,8 @@ public class BetsController : ControllerBase
     }
 }
 
-public record CreateBetBody(Guid MarketId, string CreatorOption, decimal Amount);
+public record CreateBetBody(
+    [Required] Guid MarketId,
+    [Required][StringLength(200, MinimumLength = 1)] string CreatorOption,
+    [Range(0.01, 1_000_000)] decimal Amount
+);

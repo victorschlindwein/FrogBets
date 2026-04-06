@@ -1,4 +1,4 @@
-import apiClient from './client'
+import apiClient, { publicClient } from './client'
 
 export interface CS2Team {
   id: string;
@@ -39,7 +39,7 @@ export interface RegisterStatsPayload {
 }
 
 export const getTeams = (): Promise<CS2Team[]> =>
-  apiClient.get<CS2Team[]>('/teams').then((r) => r.data)
+  publicClient.get<CS2Team[]>('/teams').then((r) => r.data)
 
 export const createTeam = (data: { name: string; logoUrl?: string }): Promise<CS2Team> =>
   apiClient.post<CS2Team>('/teams', data).then((r) => r.data)

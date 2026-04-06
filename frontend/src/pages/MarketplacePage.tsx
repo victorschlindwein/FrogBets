@@ -199,20 +199,22 @@ function TradeSection() {
       <h3>Jogadores Disponíveis para Troca</h3>
       {listingsError && <p role="alert">{listingsError}</p>}
       {loadingListings ? (
-        <p>Carregando...</p>
+        <div className="card empty-card"><p>Carregando...</p></div>
       ) : listings.length === 0 ? (
-        <p>Nenhum jogador disponível para troca.</p>
+        <div className="card empty-card"><p>Nenhum jogador disponível para troca.</p></div>
       ) : (
-        Object.entries(byTeam).map(([teamName, members]) => (
-          <div key={teamName} style={{ marginBottom: '1rem' }}>
-            <strong>{teamName}</strong>
-            <ul>
-              {members.map(m => (
-                <li key={m.userId}>{m.username}</li>
-              ))}
-            </ul>
-          </div>
-        ))
+        <div className="card">
+          {Object.entries(byTeam).map(([teamName, members]) => (
+            <div key={teamName} style={{ marginBottom: '1rem' }}>
+              <strong>{teamName}</strong>
+              <ul style={{ marginTop: '.35rem', paddingLeft: '1.25rem' }}>
+                {members.map(m => (
+                  <li key={m.userId}>{m.username}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
       )}
 
       {isTeamLeader && (
@@ -220,23 +222,25 @@ function TradeSection() {
           <h3>Minhas Ofertas Recebidas</h3>
           {offersError && <p role="alert">{offersError}</p>}
           {offers.filter(o => o.status === 'Pending').length === 0 ? (
-            <p>Nenhuma oferta pendente.</p>
+            <div className="card empty-card"><p>Nenhuma oferta pendente.</p></div>
           ) : (
-            <ul>
-              {offers.filter(o => o.status === 'Pending').map(offer => (
-                <li key={offer.id} style={{ marginBottom: '.5rem' }}>
-                  <span>
-                    {offer.proposerTeamName} oferece <strong>{offer.offeredUsername}</strong> por <strong>{offer.targetUsername}</strong> ({offer.receiverTeamName})
-                  </span>
-                  <button className="btn-primary" onClick={() => handleAcceptOffer(offer.id)} style={{ marginLeft: '.5rem', padding: '.3rem .7rem', fontSize: '.85rem' }}>
-                    Aceitar
-                  </button>
-                  <button className="btn-secondary" onClick={() => handleRejectOffer(offer.id)} style={{ marginLeft: '.5rem', padding: '.3rem .7rem', fontSize: '.85rem' }}>
-                    Recusar
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <div className="card">
+              <ul style={{ listStyle: 'none' }}>
+                {offers.filter(o => o.status === 'Pending').map(offer => (
+                  <li key={offer.id} style={{ marginBottom: '.75rem', display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
+                    <span>
+                      {offer.proposerTeamName} oferece <strong>{offer.offeredUsername}</strong> por <strong>{offer.targetUsername}</strong> ({offer.receiverTeamName})
+                    </span>
+                    <button className="btn-primary" onClick={() => handleAcceptOffer(offer.id)} style={{ padding: '.3rem .7rem', fontSize: '.85rem' }}>
+                      Aceitar
+                    </button>
+                    <button className="btn-secondary" onClick={() => handleRejectOffer(offer.id)} style={{ padding: '.3rem .7rem', fontSize: '.85rem' }}>
+                      Recusar
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           <h3>Disponibilizar para Troca</h3>
@@ -297,14 +301,14 @@ export default function MarketplacePage() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <div className="page"><p>Carregando marketplace...</p></div>
+  if (loading) return <div className="page"><div className="card empty-card"><p>Carregando marketplace...</p></div></div>
 
   return (
     <div className="page">
       <h1>🛒 Marketplace</h1>
       {error && <p role="alert">{error}</p>}
       {bets.length === 0 ? (
-        <p>Nenhuma aposta disponível para cobertura.</p>
+        <div className="card empty-card"><p>Nenhuma aposta disponível para cobertura.</p></div>
       ) : (
         <ul className="bet-list">
           {bets.map(bet => (

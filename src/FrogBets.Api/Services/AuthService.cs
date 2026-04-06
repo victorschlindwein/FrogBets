@@ -58,7 +58,7 @@ public class AuthService : IAuthService
         return new AuthResult(tokenString, expiresAt);
     }
 
-    public Task LogoutAsync(string token)
+    public async Task LogoutAsync(string token)
     {
         var handler = new JwtSecurityTokenHandler();
         if (handler.CanReadToken(token))
@@ -66,9 +66,8 @@ public class AuthService : IAuthService
             var jwt = handler.ReadJwtToken(token);
             var jti = jwt.Id;
             if (!string.IsNullOrEmpty(jti))
-                _blocklist.Revoke(jti);
+                await _blocklist.RevokeAsync(jti, jwt.ValidTo);
         }
-        return Task.CompletedTask;
     }
 
     public bool IsTokenRevoked(string jti) => _blocklist.IsRevoked(jti);

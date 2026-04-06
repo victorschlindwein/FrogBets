@@ -1,14 +1,42 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using FrogBets.Api.Services;
 using FrogBets.Infrastructure.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Limita o tamanho máximo do body de qualquer request (1 MB)
+builder.WebHost.ConfigureKestrel(options =>
+    options.Limits.MaxRequestBodySize = 1 * 1024 * 1024);
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+
+// CORS — permite apenas a origem configurada (ou localhost em dev)
+var allowedOrigins = builder.Configuration["AllowedOrigins"]?.Split(',')
+    ?? ["http://localhost:3000"];
+builder.Services.AddCors(options =>
+    options.AddPolicy("Frontend", policy =>
+        policy.WithOrigins(allowedOrigins)
+              .AllowAnyMethod()
+              .AllowAnyHeader()));
+
+// Rate limiting — proteção contra brute force nos endpoints de auth
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddFixedWindowLimiter("auth", o =>
+    {
+        o.PermitLimit = 5;
+        o.Window = TimeSpan.FromMinutes(15);
+        o.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        o.QueueLimit = 0;
+    });
+    options.RejectionStatusCode = 429;
+});
 
 // EF Core + PostgreSQL
 builder.Services.AddDbContext<FrogBetsDbContext>(options =>
@@ -94,6 +122,8 @@ using (var scope = app.Services.CreateScope())
     db.Database.Migrate();
 }
 
+app.UseCors("Frontend");
+app.UseRateLimiter();
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();

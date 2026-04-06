@@ -1,7 +1,9 @@
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using FrogBets.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace FrogBets.Api.Controllers;
 
@@ -21,6 +23,7 @@ public class AuthController : ControllerBase
     /// <summary>POST /api/auth/login — returns JWT token on valid credentials.</summary>
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         try
@@ -56,6 +59,7 @@ public class AuthController : ControllerBase
     /// <summary>POST /api/auth/register — creates a new user using a valid invite token.</summary>
     [HttpPost("register")]
     [AllowAnonymous]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> Register([FromBody] RegisterWithInviteRequest request)
     {
         Guid inviteId;
@@ -97,5 +101,14 @@ public class AuthController : ControllerBase
     }
 }
 
-public record LoginRequest(string Username, string Password);
-public record RegisterWithInviteRequest(string InviteToken, string Username, string Password, Guid? TeamId = null);
+public record LoginRequest(
+    [Required][StringLength(100, MinimumLength = 1)] string Username,
+    [Required][StringLength(200, MinimumLength = 1)] string Password
+);
+
+public record RegisterWithInviteRequest(
+    [Required] string InviteToken,
+    [Required][StringLength(50, MinimumLength = 3)] string Username,
+    [Required][StringLength(200, MinimumLength = 8)] string Password,
+    Guid? TeamId = null
+);

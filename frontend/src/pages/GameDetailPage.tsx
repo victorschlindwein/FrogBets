@@ -101,8 +101,8 @@ export default function GameDetailPage() {
       .finally(() => setLoading(false))
   }, [id])
 
-  if (loading) return <div className="page"><p>Carregando jogo...</p></div>
-  if (error) return <div className="page"><p role="alert">{error}</p></div>
+  if (loading) return <div className="page"><div className="card empty-card"><p>Carregando jogo...</p></div></div>
+  if (error) return <div className="page"><div className="card empty-card"><p role="alert">{error}</p></div></div>
   if (!game) return null
 
   const openMarkets = game.markets.filter(m => m.status === 'Open')
@@ -119,7 +119,7 @@ export default function GameDetailPage() {
         <h2>Mercados</h2>
         {!canBet && <p style={{ color: 'var(--text-muted)', marginBottom: '1rem' }}>Apostas encerradas para este jogo.</p>}
         {openMarkets.length === 0 ? (
-          <p>Nenhum mercado disponível.</p>
+          <div className="card empty-card"><p>Nenhum mercado disponível.</p></div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
             {openMarkets.map(market => (

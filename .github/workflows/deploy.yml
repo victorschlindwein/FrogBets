@@ -1,4 +1,4 @@
-name: Build & Deploy to Azure
+name: Build & Deploy to AWS
 
 on:
   push:
@@ -6,9 +6,13 @@ on:
   workflow_dispatch:
 
 env:
-  REGISTRY: ${{ secrets.ACR_LOGIN_SERVER }}
-  API_IMAGE: frogbets-api
-  FRONTEND_IMAGE: frogbets-frontend
+  AWS_REGION: us-east-1
+  API_ECR_REPO: frogbets-api
+  FRONTEND_ECR_REPO: frogbets-frontend
+
+permissions:
+  id-token: write   # necessário para OIDC
+  contents: read
 
 jobs:
   # ── 1. Testes ────────────────────────────────────────────────────────────
@@ -45,115 +49,103 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     outputs:
-      api-tag: ${{ steps.meta-api.outputs.version }}
+      api-image: ${{ steps.build-api.outputs.image }}
+      frontend-image: ${{ steps.build-frontend.outputs.image }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Azure Login (para buscar URL da API)
-        uses: azure/login@v2
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Buscar URL pública da API
-        id: api-url
-        run: |
-          FQDN=$(az containerapp show \
-            --name frogbets-api \
-            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-            --query "properties.configuration.ingress.fqdn" -o tsv 2>/dev/null || echo "")
-          if [ -n "$FQDN" ]; then
-            echo "value=https://${FQDN}" >> $GITHUB_OUTPUT
-          else
-            # Primeiro deploy: usa o secret configurado manualmente
-            echo "value=${{ secrets.ALLOWED_ORIGINS }}" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Log in to Azure Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ secrets.ACR_LOGIN_SERVER }}
-          username: ${{ secrets.ACR_USERNAME }}
-          password: ${{ secrets.ACR_PASSWORD }}
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # ── API ──────────────────────────────────────────────────────────────
-      - name: Extract metadata (API)
-        id: meta-api
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.API_IMAGE }}
-          tags: |
-            type=sha,prefix=,format=short
-            type=raw,value=latest
+      - name: Get API URL for frontend build
+        id: api-url
+        run: |
+          # Tenta buscar a URL do serviço ECS via SSM Parameter Store
+          URL=$(aws ssm get-parameter --name "/frogbets/api-url" --query "Parameter.Value" --output text 2>/dev/null || echo "")
+          echo "value=${URL}" >> $GITHUB_OUTPUT
 
+      # ── API ──────────────────────────────────────────────────────────────
       - name: Build & Push API image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: Dockerfile.api
-          push: true
-          tags: ${{ steps.meta-api.outputs.tags }}
-          labels: ${{ steps.meta-api.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+        id: build-api
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          IMAGE="$REGISTRY/$API_ECR_REPO:$IMAGE_TAG"
+          docker buildx build \
+            --platform linux/amd64 \
+            --file Dockerfile.api \
+            --tag "$IMAGE" \
+            --tag "$REGISTRY/$API_ECR_REPO:latest" \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
+            --push .
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
 
       # ── Frontend ─────────────────────────────────────────────────────────
-      - name: Extract metadata (Frontend)
-        id: meta-frontend
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}
-          tags: |
-            type=sha,prefix=,format=short
-            type=raw,value=latest
-
       - name: Build & Push Frontend image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: Dockerfile.frontend
-          push: true
-          tags: ${{ steps.meta-frontend.outputs.tags }}
-          labels: ${{ steps.meta-frontend.outputs.labels }}
-          build-args: |
-            VITE_API_URL=${{ steps.api-url.outputs.value }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+        id: build-frontend
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          IMAGE="$REGISTRY/$FRONTEND_ECR_REPO:$IMAGE_TAG"
+          docker buildx build \
+            --platform linux/amd64 \
+            --file Dockerfile.frontend \
+            --build-arg "VITE_API_URL=${{ steps.api-url.outputs.value }}" \
+            --tag "$IMAGE" \
+            --tag "$REGISTRY/$FRONTEND_ECR_REPO:latest" \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
+            --push .
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
 
   # ── 3. Deploy ────────────────────────────────────────────────────────────
   deploy:
-    name: Deploy to Azure Container Apps
+    name: Deploy to ECS Fargate
     runs-on: ubuntu-latest
     needs: build-and-push
     environment: production
     steps:
       - uses: actions/checkout@v4
 
-      - name: Azure Login
-        uses: azure/login@v2
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Deploy API
-        uses: azure/container-apps-deploy-action@v1
-        with:
-          resourceGroup: ${{ secrets.AZURE_RESOURCE_GROUP }}
-          containerAppName: frogbets-api
-          imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE }}:latest
-          environmentVariables: |
-            ASPNETCORE_ENVIRONMENT=Production
-            ConnectionStrings__DefaultConnection=${{ secrets.DB_CONNECTION_STRING }}
-            Jwt__Key=${{ secrets.JWT_KEY }}
-            Jwt__Issuer=FrogBets
-            Jwt__Audience=FrogBets
-            Jwt__ExpirationMinutes=60
-            AllowedOrigins=${{ secrets.ALLOWED_ORIGINS }}
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Deploy Frontend
-        uses: azure/container-apps-deploy-action@v1
+      - name: Deploy API to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
-          resourceGroup: ${{ secrets.AZURE_RESOURCE_GROUP }}
-          containerAppName: frogbets-frontend
-          imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.FRONTEND_IMAGE }}:latest
+          task-definition: infra/ecs-task-api.json
+          service: frogbets-api
+          cluster: frogbets
+          wait-for-service-stability: true
+          image: ${{ needs.build-and-push.outputs.api-image }}
+          container-name: frogbets-api
+
+      - name: Deploy Frontend to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: infra/ecs-task-frontend.json
+          service: frogbets-frontend
+          cluster: frogbets
+          wait-for-service-stability: true
+          image: ${{ needs.build-and-push.outputs.frontend-image }}
+          container-name: frogbets-frontend

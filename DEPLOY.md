@@ -1,4 +1,4 @@
-# Deploy FrogBets — Azure Container Apps + GitHub Actions
+# Deploy FrogBets — AWS ECS Fargate + GitHub Actions
 
 ## Visão Geral
 
@@ -6,130 +6,134 @@
 GitHub (push main)
     └── GitHub Actions
             ├── Roda testes (.NET + Vitest)
-            ├── Build & Push imagens → Azure Container Registry
-            └── Deploy → Azure Container Apps
-                            ├── frogbets-api   (ASP.NET Core)
-                            └── frogbets-frontend (Nginx + React)
+            ├── Build & Push imagens → Amazon ECR
+            └── Deploy → Amazon ECS Fargate
+                            ├── frogbets-api      (ASP.NET Core :8080)
+                            └── frogbets-frontend (Nginx + React :80)
                                         ↕
-                            Azure Database for PostgreSQL
+                            Application Load Balancer
+                              /api/* → API
+                              /*     → Frontend
+                                        ↕
+                            Amazon RDS PostgreSQL 16
 ```
 
 ---
 
 ## Pré-requisitos
 
-- Conta Azure com uma subscription ativa
-- [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) instalado
-- Acesso de admin ao repositório GitHub
+- Conta AWS ativa (free tier funciona para começar)
+- [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) instalado
+- Credenciais configuradas: `aws configure`
 
 ---
 
-## Passo 1 — Login na Azure
+## Passo 1 — Configurar AWS CLI
 
 ```bash
-az login
-az account set --subscription "<nome ou ID da sua subscription>"
+aws configure
+# AWS Access Key ID: <sua chave>
+# AWS Secret Access Key: <seu secret>
+# Default region name: us-east-1
+# Default output format: json
 ```
 
 ---
 
-## Passo 2 — Provisionar a infraestrutura
+## Passo 2 — Provisionar infraestrutura base
 
-Execute o script de setup **uma única vez**:
+Execute o script **uma única vez**:
 
 ```bash
-chmod +x infra/setup-azure.sh
-DB_ADMIN_PASSWORD="SuaSenhaSegura123!" ./infra/setup-azure.sh
+chmod +x infra/setup-aws.sh
+DB_PASSWORD="SuaSenhaSegura123!" \
+GITHUB_ORG="victorschlindwein" \
+GITHUB_REPO="FrogBets" \
+./infra/setup-aws.sh
 ```
 
 O script cria:
-- Resource Group `frogbets-rg` na região `brazilsouth`
-- Azure Container Registry (ACR) para armazenar as imagens Docker
-- PostgreSQL Flexible Server (tier Burstable B1ms — ~$15/mês)
-- Container Apps Environment
-- Container App `frogbets-api`
-- Container App `frogbets-frontend`
-- Service Principal com permissão Contributor no Resource Group
+- 2 repositórios ECR (`frogbets-api`, `frogbets-frontend`)
+- RDS PostgreSQL 16 (db.t3.micro, ~$15/mês)
+- ECS Cluster Fargate
+- IAM roles para ECS e GitHub Actions
+- SSM Parameters com os secrets (connection string, JWT key)
+- OIDC Provider para autenticação sem chaves estáticas no GitHub
 
-Ao final, o script imprime **todos os valores** que você precisa adicionar como secrets no GitHub.
-
-> Guarde a saída do script em local seguro — ela contém credenciais sensíveis.
+Ao final imprime o `AWS_ROLE_ARN` que você precisa adicionar no GitHub.
 
 ---
 
-## Passo 3 — Configurar Secrets no GitHub
-
-Acesse: **Repositório → Settings → Secrets and variables → Actions → New repository secret**
-
-| Secret | Descrição | Onde obter |
-|--------|-----------|------------|
-| `AZURE_CREDENTIALS` | JSON do Service Principal | Saída do script (bloco JSON) |
-| `AZURE_RESOURCE_GROUP` | Nome do resource group | `frogbets-rg` |
-| `ACR_LOGIN_SERVER` | URL do registry | Ex: `frogbetsacr.azurecr.io` |
-| `ACR_USERNAME` | Usuário do ACR | Saída do script |
-| `ACR_PASSWORD` | Senha do ACR | Saída do script |
-| `DB_CONNECTION_STRING` | Connection string PostgreSQL | Saída do script |
-| `JWT_KEY` | Chave JWT (64+ chars) | Saída do script (gerada automaticamente) |
-| `ALLOWED_ORIGINS` | URL pública do frontend | Ex: `https://frogbets-frontend.xxx.azurecontainerapps.io` |
-
----
-
-## Passo 4 — Configurar Environment de produção no GitHub
-
-1. Acesse **Settings → Environments → New environment**
-2. Nomeie como `production`
-3. Opcionalmente adicione **Required reviewers** para aprovar deploys manualmente
-
----
-
-## Passo 5 — Primeiro Deploy
-
-Faça um push para `main` ou dispare manualmente:
-
-```
-GitHub → Actions → Build & Deploy to Azure → Run workflow
-```
-
-O pipeline executa em ~5-8 minutos:
-1. Testes .NET e Vitest
-2. Build das imagens Docker e push para o ACR
-3. Deploy das Container Apps
-
----
-
-## Passo 6 — Criar o primeiro usuário admin
-
-Após o primeiro deploy, conecte ao banco e insira o admin:
+## Passo 3 — Criar serviços ECS e ALB
 
 ```bash
-# Conectar ao PostgreSQL via Azure CLI
-az postgres flexible-server connect \
-  --name frogbets-db \
-  --admin-user frogbetsadmin \
-  --admin-password "SuaSenhaSegura123!" \
-  --database-name FrogBets
+chmod +x infra/setup-ecs-services.sh
+./infra/setup-ecs-services.sh
 ```
 
-Ou use qualquer cliente PostgreSQL (DBeaver, psql, etc.) com o host:
-`frogbets-db.postgres.database.azure.com`
+Cria:
+- Application Load Balancer (ponto de entrada único)
+- Target Groups para API e Frontend
+- Regras de roteamento: `/api/*` → API, `/*` → Frontend
+- Serviços ECS Fargate para API e Frontend
 
-Gere o hash da senha com o utilitário incluso:
+Ao final imprime a URL pública da aplicação.
+
+---
+
+## Passo 4 — Adicionar secret no GitHub
+
+Acesse: **Repositório → Settings → Secrets and variables → Actions**
+
+| Secret | Valor |
+|--------|-------|
+| `AWS_ROLE_ARN` | ARN impresso pelo `setup-aws.sh` (ex: `arn:aws:iam::123456789:role/frogbets-github-actions`) |
+
+> O pipeline usa OIDC — sem chaves de acesso estáticas no GitHub. Mais seguro.
+
+---
+
+## Passo 5 — Criar environment de produção no GitHub
+
+1. **Settings → Environments → New environment** → nome: `production`
+2. Opcional: adicionar **Required reviewers** para aprovação manual antes do deploy
+
+---
+
+## Passo 6 — Primeiro Deploy
+
+Faça push para `main` ou dispare manualmente:
+
+```
+GitHub → Actions → Build & Deploy to AWS → Run workflow
+```
+
+O pipeline executa em ~6-10 minutos:
+1. Testes .NET e Vitest
+2. Build das imagens Docker e push para ECR
+3. Deploy nos serviços ECS (rolling update)
+
+---
+
+## Passo 7 — Criar o primeiro usuário admin
+
+Conecte ao RDS via AWS Systems Manager Session Manager ou um bastion host.
+
+Gere o hash da senha:
 ```bash
 cd tools/HashGen
 dotnet run -- "SuaSenhaAdmin123!"
 ```
 
-Insira o admin:
+Conecte ao banco e insira o admin:
 ```sql
 INSERT INTO "Users" (
   "Id", "Username", "PasswordHash", "IsAdmin",
   "VirtualBalance", "ReservedBalance", "WinsCount", "LossesCount",
   "CreatedAt", "IsTeamLeader"
 ) VALUES (
-  gen_random_uuid(),
-  'admin',
-  '<hash_gerado_acima>',
-  true, 10000, 0, 0, 0, now(), false
+  gen_random_uuid(), 'admin', '<hash_gerado>', true,
+  10000, 0, 0, 0, now(), false
 );
 ```
 
@@ -140,55 +144,56 @@ INSERT INTO "Users" (
 A partir do setup, **todo push para `main`** dispara automaticamente:
 
 ```
-push → test → build → push ACR → deploy Container Apps
+push → test → build → push ECR → deploy ECS (rolling update)
 ```
 
-Para deploys de feature branches sem afetar produção, crie um ambiente `staging`
-e adicione uma condição `if: github.ref == 'refs/heads/main'` no job de deploy.
+O ECS faz rolling update: sobe a nova versão antes de derrubar a antiga, sem downtime.
 
 ---
 
-## Custos Estimados (Azure, região Brazil South)
+## Custos Estimados (AWS, us-east-1)
 
 | Recurso | Tier | Custo/mês estimado |
 |---------|------|-------------------|
-| Container Apps (API) | 0.5 vCPU / 1GB, min 0 réplicas | ~$5–15 |
-| Container Apps (Frontend) | 0.25 vCPU / 0.5GB, min 0 réplicas | ~$2–5 |
-| PostgreSQL Flexible Server | Burstable B1ms, 32GB | ~$15 |
-| Container Registry | Basic | ~$5 |
-| **Total estimado** | | **~$27–40/mês** |
+| ECS Fargate (API) | 0.5 vCPU / 1GB | ~$15 |
+| ECS Fargate (Frontend) | 0.25 vCPU / 0.5GB | ~$7 |
+| RDS PostgreSQL | db.t3.micro, 20GB | ~$15 |
+| ECR | 2 repositórios | ~$1 |
+| ALB | 1 load balancer | ~$16 |
+| **Total estimado** | | **~$54/mês** |
 
-> Com `min-replicas: 0`, as Container Apps escalam para zero quando não há tráfego,
-> reduzindo custos em ambientes de baixo uso.
+> Para reduzir custos em ambiente de baixo uso, defina `desired-count: 0`
+> nos serviços ECS quando não estiver em uso.
 
 ---
 
-## Variáveis de Ambiente em Produção
-
-Todas as variáveis sensíveis são injetadas pelo GitHub Actions via secrets.
-**Nunca commite** valores reais de produção no repositório.
-
-Para atualizar uma variável sem novo deploy de código:
+## Monitoramento — Logs em tempo real
 
 ```bash
-az containerapp update \
-  --name frogbets-api \
-  --resource-group frogbets-rg \
-  --set-env-vars "Jwt__ExpirationMinutes=120"
+# Logs da API
+aws logs tail /ecs/frogbets-api --follow --region us-east-1
+
+# Logs do Frontend
+aws logs tail /ecs/frogbets-frontend --follow --region us-east-1
 ```
 
 ---
 
-## Monitoramento
-
-Ver logs em tempo real:
+## Atualizar variáveis de ambiente sem novo deploy
 
 ```bash
-# API
-az containerapp logs show --name frogbets-api --resource-group frogbets-rg --follow
+# Atualiza um parâmetro no SSM
+aws ssm put-parameter \
+  --name "/frogbets/jwt-key" \
+  --value "nova-chave-aqui" \
+  --type SecureString \
+  --overwrite
 
-# Frontend
-az containerapp logs show --name frogbets-frontend --resource-group frogbets-rg --follow
+# Força restart do serviço para pegar o novo valor
+aws ecs update-service \
+  --cluster frogbets \
+  --service frogbets-api \
+  --force-new-deployment
 ```
 
 ---
@@ -196,5 +201,18 @@ az containerapp logs show --name frogbets-frontend --resource-group frogbets-rg 
 ## Teardown (remover tudo)
 
 ```bash
-az group delete --name frogbets-rg --yes --no-wait
+# Para os serviços
+aws ecs update-service --cluster frogbets --service frogbets-api --desired-count 0
+aws ecs update-service --cluster frogbets --service frogbets-frontend --desired-count 0
+
+# Remove o RDS (CUIDADO: apaga os dados)
+aws rds delete-db-instance --db-instance-identifier frogbets-db --skip-final-snapshot
+
+# Remove o ALB
+ALB_ARN=$(aws elbv2 describe-load-balancers --names frogbets-alb --query "LoadBalancers[0].LoadBalancerArn" --output text)
+aws elbv2 delete-load-balancer --load-balancer-arn $ALB_ARN
+
+# Remove os repositórios ECR
+aws ecr delete-repository --repository-name frogbets-api --force
+aws ecr delete-repository --repository-name frogbets-frontend --force
 ```

@@ -1,0 +1,338 @@
+/* ── Paleta FrogBets ─────────────────────────────────────────────────────── */
+:root {
+  --green:      rgb(92, 111, 43);
+  --green-dark: rgb(65, 80, 28);
+  --green-light:rgb(130, 155, 65);
+  --orange:     rgb(222, 128, 43);
+  --orange-dark:rgb(185, 100, 25);
+  --sand:       rgb(216, 201, 167);
+  --cream:      rgb(238, 238, 238);
+  --white:      #ffffff;
+  --text:       #1a1a1a;
+  --text-muted: #555;
+  --danger:     #c0392b;
+  --success:    var(--green);
+  --radius:     8px;
+  --shadow:     0 2px 8px rgba(0,0,0,.12);
+}
+
+/* ── Reset / Base ────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--cream);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+h1 { font-size: 1.8rem; color: var(--green-dark); margin-bottom: 1.25rem; }
+h2 { font-size: 1.25rem; color: var(--green); margin-bottom: .75rem; }
+h3 { font-size: 1rem; color: var(--green); margin-bottom: .5rem; }
+
+a { color: var(--orange); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+p { line-height: 1.6; }
+
+/* ── Layout ──────────────────────────────────────────────────────────────── */
+.page {
+  max-width: 960px;
+  margin: 2rem auto;
+  padding: 0 1.25rem;
+}
+
+/* ── Navbar ──────────────────────────────────────────────────────────────── */
+nav.navbar {
+  background: var(--green-dark);
+  padding: .75rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  box-shadow: var(--shadow);
+}
+
+nav.navbar a {
+  color: var(--cream);
+  font-weight: 500;
+  font-size: .95rem;
+  transition: color .15s;
+}
+nav.navbar a:hover { color: var(--orange); text-decoration: none; }
+
+nav.navbar .nav-brand {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--orange);
+  margin-right: .5rem;
+}
+
+nav.navbar .nav-spacer { margin-left: auto; }
+
+nav.navbar .nav-user {
+  color: var(--sand);
+  font-size: .9rem;
+}
+
+/* ── Card ────────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  box-shadow: var(--shadow);
+  margin-bottom: 1.25rem;
+}
+
+/* ── Forms ───────────────────────────────────────────────────────────────── */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+  margin-bottom: 1rem;
+}
+
+label {
+  font-size: .875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+input, select, textarea {
+  padding: .55rem .75rem;
+  border: 1.5px solid var(--sand);
+  border-radius: var(--radius);
+  font-size: .95rem;
+  background: var(--white);
+  color: var(--text);
+  transition: border-color .15s;
+  width: 100%;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--green);
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+button, .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  padding: .55rem 1.25rem;
+  border: none;
+  border-radius: var(--radius);
+  font-size: .9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, transform .1s;
+}
+
+button:active { transform: scale(.97); }
+button:disabled { opacity: .55; cursor: not-allowed; }
+
+.btn-primary, button[type="submit"] {
+  background: var(--green);
+  color: var(--white);
+}
+.btn-primary:hover, button[type="submit"]:hover:not(:disabled) {
+  background: var(--green-dark);
+}
+
+.btn-secondary {
+  background: var(--sand);
+  color: var(--text);
+}
+.btn-secondary:hover { background: #c8b89a; }
+
+.btn-danger {
+  background: var(--danger);
+  color: var(--white);
+}
+.btn-danger:hover { background: #a93226; }
+
+.btn-orange {
+  background: var(--orange);
+  color: var(--white);
+}
+.btn-orange:hover { background: var(--orange-dark); }
+
+/* ── Alerts ──────────────────────────────────────────────────────────────── */
+[role="alert"] {
+  background: #fdecea;
+  color: var(--danger);
+  border: 1px solid #f5c6cb;
+  border-radius: var(--radius);
+  padding: .6rem .9rem;
+  font-size: .875rem;
+  margin-top: .5rem;
+}
+
+[role="status"] {
+  background: #eaf4e8;
+  color: var(--green-dark);
+  border: 1px solid #b7d9b0;
+  border-radius: var(--radius);
+  padding: .6rem .9rem;
+  font-size: .875rem;
+  margin-top: .5rem;
+}
+
+/* ── Tables ──────────────────────────────────────────────────────────────── */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .9rem;
+  margin-top: .75rem;
+}
+
+th {
+  background: var(--green-dark);
+  color: var(--cream);
+  padding: .6rem .75rem;
+  text-align: left;
+  font-weight: 600;
+}
+
+td {
+  padding: .55rem .75rem;
+  border-bottom: 1px solid var(--sand);
+}
+
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #f5f0e8; }
+
+/* ── Badge / Status ──────────────────────────────────────────────────────── */
+.badge {
+  display: inline-block;
+  padding: .2rem .55rem;
+  border-radius: 999px;
+  font-size: .75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.badge-pending  { background: #fff3cd; color: #856404; }
+.badge-active   { background: #d4edda; color: #155724; }
+.badge-used     { background: #d1ecf1; color: #0c5460; }
+.badge-expired  { background: #f8d7da; color: #721c24; }
+.badge-settled  { background: #e2e3e5; color: #383d41; }
+
+/* ── Auth pages (login / register) ──────────────────────────────────────── */
+.auth-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--green-dark) 0%, var(--green) 60%, var(--orange) 100%);
+}
+
+.auth-card {
+  background: var(--white);
+  border-radius: 12px;
+  padding: 2.5rem 2rem;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.2);
+}
+
+.auth-card h1 {
+  text-align: center;
+  margin-bottom: 1.75rem;
+  font-size: 1.6rem;
+}
+
+.auth-card .auth-logo {
+  text-align: center;
+  font-size: 2.5rem;
+  margin-bottom: .5rem;
+}
+
+.auth-footer {
+  text-align: center;
+  margin-top: 1.25rem;
+  font-size: .875rem;
+  color: var(--text-muted);
+}
+
+/* ── Dashboard stats ─────────────────────────────────────────────────────── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.stat-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  box-shadow: var(--shadow);
+  border-left: 4px solid var(--orange);
+}
+
+.stat-card .stat-label {
+  font-size: .8rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-bottom: .35rem;
+}
+
+.stat-card .stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--green-dark);
+}
+
+/* ── Game list ───────────────────────────────────────────────────────────── */
+.game-list { list-style: none; display: flex; flex-direction: column; gap: .75rem; }
+
+.game-item {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.game-item .game-teams { font-weight: 700; font-size: 1rem; flex: 1; }
+.game-item .game-meta  { font-size: .85rem; color: var(--text-muted); }
+
+/* ── Bet card ────────────────────────────────────────────────────────────── */
+.bet-list { list-style: none; display: flex; flex-direction: column; gap: .75rem; }
+
+.bet-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.bet-card .bet-info { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; font-size: .9rem; }
+.bet-card .bet-info span strong { color: var(--green-dark); }
+
+/* ── Token display ───────────────────────────────────────────────────────── */
+.token-display {
+  background: var(--cream);
+  border: 1.5px dashed var(--orange);
+  border-radius: var(--radius);
+  padding: .75rem 1rem;
+  font-family: monospace;
+  font-size: 1rem;
+  letter-spacing: .08em;
+  color: var(--green-dark);
+  word-break: break-all;
+}
+
+/* ── Section spacing ─────────────────────────────────────────────────────── */
+section + section { margin-top: 2rem; }

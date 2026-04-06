@@ -29,13 +29,7 @@ function marketLabel(market: Market): string {
   return market.mapNumber != null ? `${type} — Mapa ${market.mapNumber}` : type
 }
 
-function BetRow({
-  bet,
-  onCovered,
-}: {
-  bet: MarketplaceBet
-  onCovered: (id: string) => void
-}) {
+function BetRow({ bet, onCovered }: { bet: MarketplaceBet; onCovered: (id: string) => void }) {
   const [covering, setCovering] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -55,26 +49,30 @@ function BetRow({
   }
 
   return (
-    <li>
-      <div>
+    <li className="bet-card">
+      <div className="bet-info">
         <span><strong>Mercado:</strong> {marketLabel(bet.market)}</span>
-        <span> | <strong>Opção do criador:</strong> {bet.creatorOption}</span>
-        <span> | <strong>Valor:</strong> {bet.amount}</span>
+        <span><strong>Opção:</strong> {bet.creatorOption}</span>
+        <span><strong>Valor:</strong> 🪙 {bet.amount}</span>
       </div>
-      {confirming ? (
-        <div>
-          <span>Confirmar cobertura de {bet.amount} unidades?</span>
-          <button onClick={handleCover} disabled={covering}>
-            {covering ? 'Cobrindo...' : 'Confirmar'}
+      <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
+        {confirming ? (
+          <>
+            <span style={{ fontSize: '.85rem', color: 'var(--text-muted)' }}>Confirmar {bet.amount} unidades?</span>
+            <button className="btn-primary" onClick={handleCover} disabled={covering} style={{ padding: '.4rem .9rem', fontSize: '.85rem' }}>
+              {covering ? 'Cobrindo...' : 'Confirmar'}
+            </button>
+            <button className="btn-secondary" onClick={() => setConfirming(false)} disabled={covering} style={{ padding: '.4rem .9rem', fontSize: '.85rem' }}>
+              Cancelar
+            </button>
+          </>
+        ) : (
+          <button className="btn-orange" onClick={() => setConfirming(true)} style={{ padding: '.4rem .9rem', fontSize: '.85rem' }}>
+            Cobrir
           </button>
-          <button onClick={() => setConfirming(false)} disabled={covering}>
-            Cancelar
-          </button>
-        </div>
-      ) : (
-        <button onClick={() => setConfirming(true)}>Cobrir</button>
-      )}
-      {error && <p role="alert">{error}</p>}
+        )}
+        {error && <p role="alert">{error}</p>}
+      </div>
     </li>
   )
 }
@@ -91,22 +89,18 @@ export default function MarketplacePage() {
       .finally(() => setLoading(false))
   }, [])
 
-  function handleCovered(id: string) {
-    setBets(prev => prev.filter(b => b.id !== id))
-  }
-
-  if (loading) return <p>Carregando marketplace...</p>
+  if (loading) return <div className="page"><p>Carregando marketplace...</p></div>
 
   return (
-    <div>
-      <h1>Marketplace</h1>
+    <div className="page">
+      <h1>🛒 Marketplace</h1>
       {error && <p role="alert">{error}</p>}
       {bets.length === 0 ? (
         <p>Nenhuma aposta disponível para cobertura.</p>
       ) : (
-        <ul>
+        <ul className="bet-list">
           {bets.map(bet => (
-            <BetRow key={bet.id} bet={bet} onCovered={handleCovered} />
+            <BetRow key={bet.id} bet={bet} onCovered={id => setBets(prev => prev.filter(b => b.id !== id))} />
           ))}
         </ul>
       )}

@@ -26,6 +26,14 @@ const STATUS_LABELS: Record<string, string> = {
   Voided: 'Anulada',
 }
 
+const STATUS_BADGE: Record<string, string> = {
+  Pending: 'badge-pending',
+  Active: 'badge-active',
+  Settled: 'badge-settled',
+  Cancelled: 'badge-expired',
+  Voided: 'badge-settled',
+}
+
 const MARKET_TYPE_LABELS: Record<string, string> = {
   MapWinner: 'Vencedor do Mapa',
   SeriesWinner: 'Vencedor da Série',
@@ -57,22 +65,21 @@ function BetCard({ bet, onCancel }: { bet: Bet; onCancel: (id: string) => void }
   }
 
   return (
-    <li>
-      <div>
+    <li className="bet-card">
+      <div className="bet-info">
         <span><strong>Mercado:</strong> {marketLabel(bet.market)}</span>
-        <span> | <strong>Opção:</strong> {bet.creatorOption}</span>
-        <span> | <strong>Valor:</strong> {bet.amount}</span>
-        {bet.coveredById && (
-          <span> | <strong>Contraparte:</strong> {bet.coveredById}</span>
-        )}
-        <span> | <strong>Status:</strong> {STATUS_LABELS[bet.status] ?? bet.status}</span>
+        <span><strong>Opção:</strong> {bet.creatorOption}</span>
+        <span><strong>Valor:</strong> 🪙 {bet.amount}</span>
+        <span className={`badge ${STATUS_BADGE[bet.status] ?? ''}`}>{STATUS_LABELS[bet.status] ?? bet.status}</span>
       </div>
-      {bet.status === 'Pending' && (
-        <button onClick={handleCancel} disabled={cancelling}>
-          {cancelling ? 'Cancelando...' : 'Cancelar'}
-        </button>
-      )}
-      {error && <p role="alert">{error}</p>}
+      <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
+        {bet.status === 'Pending' && (
+          <button className="btn-danger" onClick={handleCancel} disabled={cancelling} style={{ padding: '.4rem .9rem', fontSize: '.85rem' }}>
+            {cancelling ? 'Cancelando...' : 'Cancelar'}
+          </button>
+        )}
+        {error && <p role="alert">{error}</p>}
+      </div>
     </li>
   )
 }
@@ -97,49 +104,31 @@ export default function BetsPage() {
   const active = bets.filter(b => b.status === 'Active')
   const settled = bets.filter(b => b.status === 'Settled' || b.status === 'Voided' || b.status === 'Cancelled')
 
-  if (loading) return <p>Carregando apostas...</p>
+  if (loading) return <div className="page"><p>Carregando apostas...</p></div>
 
   return (
-    <div>
+    <div className="page">
       <h1>Minhas Apostas</h1>
       {error && <p role="alert">{error}</p>}
 
       <section>
         <h2>Pendentes</h2>
-        {pending.length === 0 ? (
-          <p>Nenhuma aposta pendente.</p>
-        ) : (
-          <ul>
-            {pending.map(bet => (
-              <BetCard key={bet.id} bet={bet} onCancel={handleCancel} />
-            ))}
-          </ul>
+        {pending.length === 0 ? <p>Nenhuma aposta pendente.</p> : (
+          <ul className="bet-list">{pending.map(bet => <BetCard key={bet.id} bet={bet} onCancel={handleCancel} />)}</ul>
         )}
       </section>
 
       <section>
         <h2>Ativas</h2>
-        {active.length === 0 ? (
-          <p>Nenhuma aposta ativa.</p>
-        ) : (
-          <ul>
-            {active.map(bet => (
-              <BetCard key={bet.id} bet={bet} onCancel={handleCancel} />
-            ))}
-          </ul>
+        {active.length === 0 ? <p>Nenhuma aposta ativa.</p> : (
+          <ul className="bet-list">{active.map(bet => <BetCard key={bet.id} bet={bet} onCancel={handleCancel} />)}</ul>
         )}
       </section>
 
       <section>
         <h2>Liquidadas / Encerradas</h2>
-        {settled.length === 0 ? (
-          <p>Nenhuma aposta liquidada.</p>
-        ) : (
-          <ul>
-            {settled.map(bet => (
-              <BetCard key={bet.id} bet={bet} onCancel={handleCancel} />
-            ))}
-          </ul>
+        {settled.length === 0 ? <p>Nenhuma aposta liquidada.</p> : (
+          <ul className="bet-list">{settled.map(bet => <BetCard key={bet.id} bet={bet} onCancel={handleCancel} />)}</ul>
         )}
       </section>
     </div>

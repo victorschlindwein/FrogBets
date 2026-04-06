@@ -84,8 +84,9 @@ function CreateGameForm({ onCreated }: { onCreated: () => void }) {
   return (
     <section>
       <h2>Cadastrar Jogo</h2>
+      <div className="card">
       <form onSubmit={handleSubmit}>
-        <div>
+        <div className="form-group">
           <label htmlFor="teamA">Time A:</label>
           <input
             id="teamA"
@@ -95,7 +96,7 @@ function CreateGameForm({ onCreated }: { onCreated: () => void }) {
             required
           />
         </div>
-        <div>
+        <div className="form-group">
           <label htmlFor="teamB">Time B:</label>
           <input
             id="teamB"
@@ -105,7 +106,7 @@ function CreateGameForm({ onCreated }: { onCreated: () => void }) {
             required
           />
         </div>
-        <div>
+        <div className="form-group">
           <label htmlFor="scheduledAt">Data e Hora:</label>
           <input
             id="scheduledAt"
@@ -115,7 +116,7 @@ function CreateGameForm({ onCreated }: { onCreated: () => void }) {
             required
           />
         </div>
-        <div>
+        <div className="form-group">
           <label htmlFor="numberOfMaps">Número de Mapas:</label>
           <input
             id="numberOfMaps"
@@ -133,6 +134,7 @@ function CreateGameForm({ onCreated }: { onCreated: () => void }) {
         {success && <p role="status">{success}</p>}
         {error && <p role="alert">{error}</p>}
       </form>
+      </div>
     </section>
   )
 }
@@ -367,9 +369,10 @@ function InvitesSection() {
 
   return (
     <section>
-      <h2>Convites</h2>
+      <h2>🎟️ Convites</h2>
+      <div className="card">
       <form onSubmit={handleCreate}>
-        <div>
+        <div className="form-group">
           <label htmlFor="inviteExpiresAt">Expira em:</label>
           <input
             id="inviteExpiresAt"
@@ -379,7 +382,7 @@ function InvitesSection() {
             required
           />
         </div>
-        <div>
+        <div className="form-group">
           <label htmlFor="inviteDescription">Destinatário (opcional):</label>
           <input
             id="inviteDescription"
@@ -394,10 +397,12 @@ function InvitesSection() {
         {error && <p role="alert">{error}</p>}
       </form>
       {newToken && (
-        <p role="status">
-          Convite gerado: <strong>{newToken}</strong>
+        <p role="status" style={{ marginTop: '1rem' }}>
+          Convite gerado: <span className="token-display">{newToken}</span>
         </p>
       )}
+      </div>
+      <div className="card" style={{ padding: 0, overflow: 'hidden', marginTop: '1rem' }}>
       <table>
         <thead>
           <tr>
@@ -412,20 +417,23 @@ function InvitesSection() {
         <tbody>
           {invites.map(invite => (
             <tr key={invite.id}>
-              <td>{invite.token}</td>
+              <td><code style={{ fontSize: '.8rem' }}>{invite.token}</code></td>
               <td>{invite.description ?? '—'}</td>
-              <td>{invite.status}</td>
+              <td>
+                <span className={`badge badge-${invite.status.toLowerCase()}`}>{invite.status}</span>
+              </td>
               <td>{new Date(invite.createdAt).toLocaleString('pt-BR')}</td>
               <td>{new Date(invite.expiresAt).toLocaleString('pt-BR')}</td>
               <td>
                 {invite.status === 'Pending' && (
-                  <button onClick={() => handleRevoke(invite.id)}>Revogar</button>
+                  <button className="btn-danger" onClick={() => handleRevoke(invite.id)} style={{ padding: '.3rem .7rem', fontSize: '.8rem' }}>Revogar</button>
                 )}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+      </div>
     </section>
   )
 }
@@ -460,8 +468,8 @@ export default function AdminPage() {
   if (accessDenied || !user) return <p role="alert">Acesso negado</p>
 
   return (
-    <div>
-      <h1>Administração</h1>
+    <div className="page">
+      <h1>⚙️ Administração</h1>
       <CreateGameForm onCreated={loadGames} />
       <StartGameSection games={games} onStarted={loadGames} />
       <RegisterResultSection games={games} />

@@ -25,15 +25,17 @@ export default function Navbar() {
   }
 
   return (
-    <nav style={{ display: 'flex', gap: '1rem', padding: '0.75rem 1rem', borderBottom: '1px solid #ccc', alignItems: 'center' }}>
+    <nav className="navbar">
+      <span className="nav-brand">🐸 FrogBets</span>
       <Link to="/">Dashboard</Link>
       <Link to="/games">Jogos</Link>
       <Link to="/bets">Minhas Apostas</Link>
       <Link to="/marketplace">Marketplace</Link>
       <Link to="/leaderboard">Ranking</Link>
       {me?.isAdmin && <Link to="/admin">Admin</Link>}
-      <span style={{ marginLeft: 'auto' }}>{me?.username}</span>
-      <button onClick={handleLogout}>Sair</button>
+      <span className="nav-spacer" />
+      <span className="nav-user">{me?.username}</span>
+      <button className="btn-orange" onClick={handleLogout} style={{ padding: '.4rem .9rem', fontSize: '.85rem' }}>Sair</button>
     </nav>
   )
 }

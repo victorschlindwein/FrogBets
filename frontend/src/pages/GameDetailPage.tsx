@@ -40,21 +40,15 @@ function BetForm({ market, game }: { market: Market; game: Game }) {
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
   const isTeamMarket = TEAM_MARKETS.includes(market.type)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!option || !amount) return
     setSubmitting(true)
     setError(null)
     setSuccess(false)
     try {
-      await apiClient.post('/bets', {
-        marketId: market.id,
-        creatorOption: option,
-        amount: parseFloat(amount),
-      })
+      await apiClient.post('/bets', { marketId: market.id, creatorOption: option, amount: parseFloat(amount) })
       setSuccess(true)
       setOption('')
       setAmount('')
@@ -67,61 +61,29 @@ function BetForm({ market, game }: { market: Market; game: Game }) {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <div>
-        <label htmlFor={`option-${market.id}`}>Opção:</label>
+    <form onSubmit={handleSubmit} style={{ marginTop: '.75rem', display: 'flex', gap: '.75rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+      <div className="form-group" style={{ marginBottom: 0, minWidth: '160px' }}>
+        <label htmlFor={`option-${market.id}`}>Opção</label>
         {isTeamMarket ? (
-          <select
-            id={`option-${market.id}`}
-            value={option}
-            onChange={e => setOption(e.target.value)}
-            required
-          >
+          <select id={`option-${market.id}`} value={option} onChange={e => setOption(e.target.value)} required>
             <option value="">Selecione</option>
             <option value={game.teamA}>{game.teamA}</option>
             <option value={game.teamB}>{game.teamB}</option>
           </select>
         ) : (
-          <input
-            id={`option-${market.id}`}
-            type="text"
-            placeholder="Nome do jogador"
-            value={option}
-            onChange={e => setOption(e.target.value)}
-            required
-          />
+          <input id={`option-${market.id}`} type="text" placeholder="Nome do jogador" value={option} onChange={e => setOption(e.target.value)} required />
         )}
       </div>
-      <div>
-        <label htmlFor={`amount-${market.id}`}>Valor:</label>
-        <input
-          id={`amount-${market.id}`}
-          type="number"
-          min="1"
-          step="1"
-          placeholder="Valor da aposta"
-          value={amount}
-          onChange={e => setAmount(e.target.value)}
-          required
-        />
+      <div className="form-group" style={{ marginBottom: 0, minWidth: '120px' }}>
+        <label htmlFor={`amount-${market.id}`}>Valor</label>
+        <input id={`amount-${market.id}`} type="number" min="1" step="1" placeholder="Valor" value={amount} onChange={e => setAmount(e.target.value)} required />
       </div>
-      <button type="submit" disabled={submitting}>
-        {submitting ? 'Criando...' : 'Criar Aposta'}
+      <button type="submit" disabled={submitting} style={{ marginBottom: 0 }}>
+        {submitting ? 'Criando...' : 'Apostar'}
       </button>
-      {success && <p role="status">Aposta criada com sucesso!</p>}
+      {success && <p role="status">Aposta criada!</p>}
       {error && <p role="alert">{error}</p>}
     </form>
-  )
-}
-
-function MarketItem({ market, game }: { market: Market; game: Game }) {
-  const canBet = game.status === 'Scheduled' && market.status === 'Open'
-
-  return (
-    <li>
-      <strong>{marketLabel(market)}</strong>
-      {canBet && <BetForm market={market} game={game} />}
-    </li>
   )
 }
 
@@ -139,32 +101,34 @@ export default function GameDetailPage() {
       .finally(() => setLoading(false))
   }, [id])
 
-  if (loading) return <p>Carregando jogo...</p>
-  if (error) return <p role="alert">{error}</p>
+  if (loading) return <div className="page"><p>Carregando jogo...</p></div>
+  if (error) return <div className="page"><p role="alert">{error}</p></div>
   if (!game) return null
 
   const openMarkets = game.markets.filter(m => m.status === 'Open')
+  const canBet = game.status === 'Scheduled'
 
   return (
-    <div>
+    <div className="page">
       <h1>{game.teamA} vs {game.teamB}</h1>
-      <p>Data: {new Date(game.scheduledAt).toLocaleString('pt-BR')}</p>
-      <p>Formato: Bo{game.numberOfMaps}</p>
-      <p>Status: {game.status === 'Scheduled' ? 'Agendado' : game.status === 'InProgress' ? 'Em andamento' : 'Finalizado'}</p>
+      <div className="card">
+        <p>📅 {new Date(game.scheduledAt).toLocaleString('pt-BR')} &nbsp;|&nbsp; Bo{game.numberOfMaps}</p>
+      </div>
 
       <section>
         <h2>Mercados</h2>
-        {game.status !== 'Scheduled' && (
-          <p>Apostas encerradas para este jogo.</p>
-        )}
+        {!canBet && <p style={{ color: 'var(--text-muted)', marginBottom: '1rem' }}>Apostas encerradas para este jogo.</p>}
         {openMarkets.length === 0 ? (
           <p>Nenhum mercado disponível.</p>
         ) : (
-          <ul>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
             {openMarkets.map(market => (
-              <MarketItem key={market.id} market={market} game={game} />
+              <div key={market.id} className="card">
+                <strong>{marketLabel(market)}</strong>
+                {canBet && <BetForm market={market} game={game} />}
+              </div>
             ))}
-          </ul>
+          </div>
         )}
       </section>
     </div>

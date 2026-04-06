@@ -20,37 +20,39 @@ export default function LeaderboardPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <p>Carregando classificação...</p>
+  if (loading) return <div className="page"><p>Carregando classificação...</p></div>
 
   return (
-    <div>
-      <h1>Classificação</h1>
+    <div className="page">
+      <h1>🏆 Classificação</h1>
       {error && <p role="alert">{error}</p>}
       {entries.length === 0 ? (
         <p>Nenhum usuário encontrado.</p>
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Posição</th>
-              <th>Usuário</th>
-              <th>Saldo Virtual</th>
-              <th>Vitórias</th>
-              <th>Derrotas</th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((entry, index) => (
-              <tr key={entry.username}>
-                <td>{index + 1}</td>
-                <td>{entry.username}</td>
-                <td>{entry.virtualBalance}</td>
-                <td>{entry.winsCount}</td>
-                <td>{entry.lossesCount}</td>
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Usuário</th>
+                <th>Saldo</th>
+                <th>Vitórias</th>
+                <th>Derrotas</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {entries.map((entry, index) => (
+                <tr key={entry.username}>
+                  <td><strong>{index + 1}</strong></td>
+                  <td>{index === 0 ? '🥇 ' : index === 1 ? '🥈 ' : index === 2 ? '🥉 ' : ''}{entry.username}</td>
+                  <td>🪙 {entry.virtualBalance.toLocaleString('pt-BR')}</td>
+                  <td style={{ color: 'var(--green)' }}>{entry.winsCount}</td>
+                  <td style={{ color: 'var(--danger)' }}>{entry.lossesCount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )

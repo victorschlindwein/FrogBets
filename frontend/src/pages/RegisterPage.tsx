@@ -35,44 +35,48 @@ export default function RegisterPage() {
   }
 
   return (
-    <div>
-      <h1>FrogBets — Criar Conta</h1>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label htmlFor="inviteToken">Código de Convite</label>
-          <input
-            id="inviteToken"
-            value={inviteToken}
-            onChange={e => setInviteToken(e.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="username">Usuário</label>
-          <input
-            id="username"
-            value={username}
-            onChange={e => setUsername(e.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="password">Senha</label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            minLength={8}
-            required
-          />
-        </div>
-        {error && <p role="alert">{error}</p>}
-        <button type="submit">Criar Conta</button>
-      </form>
-      <p>
-        Já tem conta? <Link to="/login">Entrar</Link>
-      </p>
+    <div className="auth-wrapper">
+      <div className="auth-card">
+        <div className="auth-logo">🐸</div>
+        <h1>Criar Conta</h1>
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="inviteToken">Código de Convite</label>
+            <input
+              id="inviteToken"
+              value={inviteToken}
+              onChange={e => setInviteToken(e.target.value)}
+              placeholder="Cole o código aqui"
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="username">Usuário</label>
+            <input
+              id="username"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="password">Senha</label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              minLength={8}
+              required
+            />
+          </div>
+          {error && <p role="alert">{error}</p>}
+          <button type="submit" style={{ width: '100%', marginTop: '.5rem' }}>Criar Conta</button>
+        </form>
+        <p className="auth-footer">
+          Já tem conta? <Link to="/login">Entrar</Link>
+        </p>
+      </div>
     </div>
   )
 }

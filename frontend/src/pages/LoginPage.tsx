@@ -21,23 +21,26 @@ export default function LoginPage() {
   }
 
   return (
-    <div>
-      <h1>FrogBets — Login</h1>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label htmlFor="username">Usuário</label>
-          <input id="username" value={username} onChange={e => setUsername(e.target.value)} required />
-        </div>
-        <div>
-          <label htmlFor="password">Senha</label>
-          <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} required />
-        </div>
-        {error && <p role="alert">{error}</p>}
-        <button type="submit">Entrar</button>
-      </form>
-      <p>
-        Não tem conta? <Link to="/register">Criar conta</Link>
-      </p>
+    <div className="auth-wrapper">
+      <div className="auth-card">
+        <div className="auth-logo">🐸</div>
+        <h1>FrogBets</h1>
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="username">Usuário</label>
+            <input id="username" value={username} onChange={e => setUsername(e.target.value)} required autoFocus />
+          </div>
+          <div className="form-group">
+            <label htmlFor="password">Senha</label>
+            <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} required />
+          </div>
+          {error && <p role="alert">{error}</p>}
+          <button type="submit" style={{ width: '100%', marginTop: '.5rem' }}>Entrar</button>
+        </form>
+        <p className="auth-footer">
+          Não tem conta? <Link to="/register">Criar conta</Link>
+        </p>
+      </div>
     </div>
   )
 }

@@ -1,0 +1,89 @@
+using FrogBets.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
+
+namespace FrogBets.Api.Services;
+
+public class TeamMembershipService : ITeamMembershipService
+{
+    private readonly FrogBetsDbContext _db;
+
+    public TeamMembershipService(FrogBetsDbContext db)
+    {
+        _db = db;
+    }
+
+    public async Task AssignLeaderAsync(Guid teamId, Guid userId)
+    {
+        var team = await _db.CS2Teams.FirstOrDefaultAsync(t => t.Id == teamId)
+            ?? throw new InvalidOperationException("TEAM_NOT_FOUND");
+
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId)
+            ?? throw new InvalidOperationException("USER_NOT_FOUND");
+
+        if (user.TeamId != teamId)
+        {
+            // Se o usuário pertence a outro time e já é líder lá, rejeitar
+            if (user.IsTeamLeader)
+                throw new InvalidOperationException("ALREADY_LEADER_OF_OTHER_TEAM");
+
+            throw new InvalidOperationException("USER_NOT_IN_TEAM");
+        }
+
+        // Remover líder atual do time, se existir
+        var currentLeader = await _db.Users
+            .FirstOrDefaultAsync(u => u.IsTeamLeader && u.TeamId == teamId && u.Id != userId);
+
+        if (currentLeader is not null)
+        {
+            currentLeader.IsTeamLeader = false;
+        }
+
+        user.IsTeamLeader = true;
+        await _db.SaveChangesAsync();
+    }
+
+    public async Task RemoveLeaderAsync(Guid teamId)
+    {
+        _ = await _db.CS2Teams.FirstOrDefaultAsync(t => t.Id == teamId)
+            ?? throw new InvalidOperationException("TEAM_NOT_FOUND");
+
+        var leader = await _db.Users
+            .FirstOrDefaultAsync(u => u.IsTeamLeader && u.TeamId == teamId);
+
+        if (leader is not null)
+        {
+            leader.IsTeamLeader = false;
+            await _db.SaveChangesAsync();
+        }
+    }
+
+    public async Task MoveUserAsync(Guid requesterId, bool requesterIsAdmin, Guid targetUserId, Guid? destinationTeamId)
+    {
+        var targetUser = await _db.Users.FirstOrDefaultAsync(u => u.Id == targetUserId)
+            ?? throw new InvalidOperationException("USER_NOT_FOUND");
+
+        if (!requesterIsAdmin)
+        {
+            var requester = await _db.Users.FirstOrDefaultAsync(u => u.Id == requesterId)
+                ?? throw new InvalidOperationException("USER_NOT_FOUND");
+
+            if (!requester.IsTeamLeader || requester.TeamId != targetUser.TeamId)
+                throw new InvalidOperationException("FORBIDDEN");
+        }
+
+        if (destinationTeamId.HasValue)
+        {
+            _ = await _db.CS2Teams.FirstOrDefaultAsync(t => t.Id == destinationTeamId.Value)
+                ?? throw new InvalidOperationException("TEAM_NOT_FOUND");
+        }
+
+        // Se o usuário alvo era líder, remover o papel automaticamente
+        if (targetUser.IsTeamLeader)
+        {
+            targetUser.IsTeamLeader = false;
+        }
+
+        targetUser.TeamId = destinationTeamId;
+        await _db.SaveChangesAsync();
+    }
+}

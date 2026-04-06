@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using FrogBets.Api.Controllers;
+using FrogBets.Api.Services;
 using FrogBets.Domain.Entities;
 using FrogBets.Infrastructure.Data;
 using Microsoft.AspNetCore.Http;
@@ -26,7 +27,8 @@ public class UsersControllerTests
 
     private static UsersController CreateController(FrogBetsDbContext db, Guid? authenticatedUserId = null)
     {
-        var controller = new UsersController(db);
+        var teamMembershipService = new StubTeamMembershipService();
+        var controller = new UsersController(db, teamMembershipService);
 
         if (authenticatedUserId.HasValue)
         {
@@ -189,4 +191,12 @@ public class UsersControllerTests
 
         Assert.IsType<NotFoundResult>(result);
     }
+}
+
+// Stub for ITeamMembershipService — not used in these tests
+file class StubTeamMembershipService : ITeamMembershipService
+{
+    public Task AssignLeaderAsync(Guid teamId, Guid userId) => Task.CompletedTask;
+    public Task RemoveLeaderAsync(Guid teamId) => Task.CompletedTask;
+    public Task MoveUserAsync(Guid requesterId, bool requesterIsAdmin, Guid targetUserId, Guid? destinationTeamId) => Task.CompletedTask;
 }

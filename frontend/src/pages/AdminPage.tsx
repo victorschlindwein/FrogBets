@@ -843,6 +843,252 @@ function MatchStatsSection() {
   )
 }
 
+function LeaderManagementSection() {
+  const [teams, setTeams] = useState<CS2Team[]>([])
+
+  // Designar Líder
+  const [assignTeamId, setAssignTeamId] = useState('')
+  const [assignUserId, setAssignUserId] = useState('')
+  const [assignSubmitting, setAssignSubmitting] = useState(false)
+  const [assignSuccess, setAssignSuccess] = useState<string | null>(null)
+  const [assignError, setAssignError] = useState<string | null>(null)
+
+  // Remover Líder
+  const [removeTeamId, setRemoveTeamId] = useState('')
+  const [removeSubmitting, setRemoveSubmitting] = useState(false)
+  const [removeSuccess, setRemoveSuccess] = useState<string | null>(null)
+  const [removeError, setRemoveError] = useState<string | null>(null)
+
+  // Mover Usuário
+  const [moveUserId, setMoveUserId] = useState('')
+  const [moveTeamId, setMoveTeamId] = useState('')
+  const [moveSubmitting, setMoveSubmitting] = useState(false)
+  const [moveSuccess, setMoveSuccess] = useState<string | null>(null)
+  const [moveError, setMoveError] = useState<string | null>(null)
+
+  useEffect(() => {
+    getTeams().then(setTeams).catch(() => {})
+  }, [])
+
+  async function handleAssignLeader(e: React.FormEvent) {
+    e.preventDefault()
+    setAssignSubmitting(true)
+    setAssignSuccess(null)
+    setAssignError(null)
+    try {
+      await apiClient.post(`/teams/${assignTeamId}/leader/${assignUserId}`)
+      setAssignSuccess('Líder designado com sucesso!')
+      setAssignTeamId('')
+      setAssignUserId('')
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: { message?: string } } } }
+      setAssignError(axiosErr.response?.data?.error?.message ?? 'Erro ao designar líder.')
+    } finally {
+      setAssignSubmitting(false)
+    }
+  }
+
+  async function handleRemoveLeader(e: React.FormEvent) {
+    e.preventDefault()
+    setRemoveSubmitting(true)
+    setRemoveSuccess(null)
+    setRemoveError(null)
+    try {
+      await apiClient.delete(`/teams/${removeTeamId}/leader`)
+      setRemoveSuccess('Líder removido com sucesso!')
+      setRemoveTeamId('')
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: { message?: string } } } }
+      setRemoveError(axiosErr.response?.data?.error?.message ?? 'Erro ao remover líder.')
+    } finally {
+      setRemoveSubmitting(false)
+    }
+  }
+
+  async function handleMoveUser(e: React.FormEvent) {
+    e.preventDefault()
+    setMoveSubmitting(true)
+    setMoveSuccess(null)
+    setMoveError(null)
+    try {
+      await apiClient.patch(`/users/${moveUserId}/team`, { teamId: moveTeamId || null })
+      setMoveSuccess('Usuário movido com sucesso!')
+      setMoveUserId('')
+      setMoveTeamId('')
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: { message?: string } } } }
+      setMoveError(axiosErr.response?.data?.error?.message ?? 'Erro ao mover usuário.')
+    } finally {
+      setMoveSubmitting(false)
+    }
+  }
+
+  return (
+    <section>
+      <h2>👑 Gestão de Líderes</h2>
+
+      <div className="card">
+        <h3>Designar Líder</h3>
+        <form onSubmit={handleAssignLeader}>
+          <div className="form-group">
+            <label htmlFor="assignLeaderTeam">Time:</label>
+            <select
+              id="assignLeaderTeam"
+              value={assignTeamId}
+              onChange={e => setAssignTeamId(e.target.value)}
+              required
+            >
+              <option value="">Selecione um time</option>
+              {teams.map(team => (
+                <option key={team.id} value={team.id}>{team.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="assignLeaderUserId">ID do Usuário:</label>
+            <input
+              id="assignLeaderUserId"
+              type="text"
+              value={assignUserId}
+              onChange={e => setAssignUserId(e.target.value)}
+              placeholder="UUID do usuário"
+              required
+            />
+          </div>
+          <button type="submit" disabled={assignSubmitting}>
+            {assignSubmitting ? 'Designando...' : 'Designar Líder'}
+          </button>
+          {assignSuccess && <p role="status">{assignSuccess}</p>}
+          {assignError && <p role="alert">{assignError}</p>}
+        </form>
+      </div>
+
+      <div className="card" style={{ marginTop: '1rem' }}>
+        <h3>Remover Líder</h3>
+        <form onSubmit={handleRemoveLeader}>
+          <div className="form-group">
+            <label htmlFor="removeLeaderTeam">Time:</label>
+            <select
+              id="removeLeaderTeam"
+              value={removeTeamId}
+              onChange={e => setRemoveTeamId(e.target.value)}
+              required
+            >
+              <option value="">Selecione um time</option>
+              {teams.map(team => (
+                <option key={team.id} value={team.id}>{team.name}</option>
+              ))}
+            </select>
+          </div>
+          <button type="submit" disabled={removeSubmitting}>
+            {removeSubmitting ? 'Removendo...' : 'Remover Líder'}
+          </button>
+          {removeSuccess && <p role="status">{removeSuccess}</p>}
+          {removeError && <p role="alert">{removeError}</p>}
+        </form>
+      </div>
+
+      <div className="card" style={{ marginTop: '1rem' }}>
+        <h3>Mover Usuário de Time</h3>
+        <form onSubmit={handleMoveUser}>
+          <div className="form-group">
+            <label htmlFor="moveUserId">ID do Usuário:</label>
+            <input
+              id="moveUserId"
+              type="text"
+              value={moveUserId}
+              onChange={e => setMoveUserId(e.target.value)}
+              placeholder="UUID do usuário"
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="moveUserTeam">Time Destino:</label>
+            <select
+              id="moveUserTeam"
+              value={moveTeamId}
+              onChange={e => setMoveTeamId(e.target.value)}
+            >
+              <option value="">Remover do time</option>
+              {teams.map(team => (
+                <option key={team.id} value={team.id}>{team.name}</option>
+              ))}
+            </select>
+          </div>
+          <button type="submit" disabled={moveSubmitting}>
+            {moveSubmitting ? 'Movendo...' : 'Mover'}
+          </button>
+          {moveSuccess && <p role="status">{moveSuccess}</p>}
+          {moveError && <p role="alert">{moveError}</p>}
+        </form>
+      </div>
+    </section>
+  )
+}
+
+function DirectSwapSection() {
+  const [userAId, setUserAId] = useState('')
+  const [userBId, setUserBId] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [success, setSuccess] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSwap(e: React.FormEvent) {
+    e.preventDefault()
+    setSubmitting(true)
+    setSuccess(null)
+    setError(null)
+    try {
+      await apiClient.post('/trades/direct', { userAId, userBId })
+      setSuccess('Troca realizada com sucesso!')
+      setUserAId('')
+      setUserBId('')
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: { message?: string } } } }
+      setError(axiosErr.response?.data?.error?.message ?? 'Erro ao realizar troca.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <section>
+      <h2>🔄 Troca Direta</h2>
+      <div className="card">
+        <form onSubmit={handleSwap}>
+          <div className="form-group">
+            <label htmlFor="swapUserAId">ID do Usuário A:</label>
+            <input
+              id="swapUserAId"
+              type="text"
+              value={userAId}
+              onChange={e => setUserAId(e.target.value)}
+              placeholder="UUID do usuário A"
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="swapUserBId">ID do Usuário B:</label>
+            <input
+              id="swapUserBId"
+              type="text"
+              value={userBId}
+              onChange={e => setUserBId(e.target.value)}
+              placeholder="UUID do usuário B"
+              required
+            />
+          </div>
+          <button type="submit" disabled={submitting}>
+            {submitting ? 'Trocando...' : 'Trocar'}
+          </button>
+          {success && <p role="status">{success}</p>}
+          {error && <p role="alert">{error}</p>}
+        </form>
+      </div>
+    </section>
+  )
+}
+
 export default function AdminPage() {
   const [user, setUser] = useState<User | null>(null)
   const [games, setGames] = useState<Game[]>([])
@@ -882,6 +1128,8 @@ export default function AdminPage() {
       <TeamsSection />
       <PlayersSection />
       <MatchStatsSection />
+      <LeaderManagementSection />
+      <DirectSwapSection />
     </div>
   )
 }

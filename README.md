@@ -18,14 +18,16 @@ O FrogBets resolve tudo isso em uma aplicação web self-hosted, sem dinheiro re
 
 ## Funcionalidades
 
-- Registro via convite (sistema de invite codes)
-- Apostas P2P: usuários criam e cobrem apostas em mercados de partidas
+- Registro via convite (sistema de invite codes) com seleção opcional de time no cadastro
+- Apostas P2P: qualquer usuário autenticado cria e cobre apostas em mercados de partidas
 - Mercados de apostas criados por admins (ex: "Quem vence o mapa 1?")
 - Liquidação automática de apostas após resultado ser registrado
 - Leaderboard com saldo virtual, vitórias e derrotas
 - Ranking de jogadores por performance (Rating 2.0 adaptado do HLTV)
 - Painel administrativo para gerenciar jogos, times, jogadores e resultados
 - Notificações in-app
+- Times de usuários: cada usuário pode pertencer a um time, com papel de líder de time
+- Marketplace de trocas: líderes de time podem disponibilizar membros para troca, criar e aceitar ofertas entre times
 
 ---
 
@@ -118,8 +120,8 @@ npm run dev
 A plataforma usa um sistema de convites. Para criar o primeiro usuário administrador, insira um registro diretamente no banco:
 
 ```sql
-INSERT INTO "Users" ("Id", "Username", "PasswordHash", "IsAdmin", "VirtualBalance", "ReservedBalance", "WinsCount", "LossesCount", "CreatedAt")
-VALUES (gen_random_uuid(), 'admin', '<bcrypt_hash>', true, 10000, 0, 0, 0, now());
+INSERT INTO "Users" ("Id", "Username", "PasswordHash", "IsAdmin", "VirtualBalance", "ReservedBalance", "WinsCount", "LossesCount", "CreatedAt", "IsTeamLeader")
+VALUES (gen_random_uuid(), 'admin', '<bcrypt_hash>', true, 10000, 0, 0, 0, now(), false);
 ```
 
 Após isso, use o painel admin para gerar convites para os demais usuários.

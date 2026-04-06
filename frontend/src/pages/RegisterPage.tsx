@@ -1,20 +1,28 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import apiClient, { setToken } from '../api/client'
+import { getTeams, CS2Team } from '../api/players'
 
 const ERROR_MESSAGES: Record<string, string> = {
   INVALID_INVITE: 'Convite inválido ou expirado.',
   INVITE_ALREADY_USED: 'Este convite já foi utilizado.',
   USERNAME_TAKEN: 'Nome de usuário já está em uso.',
   PASSWORD_TOO_SHORT: 'A senha deve ter no mínimo 8 caracteres.',
+  TEAM_NOT_FOUND: 'Time não encontrado.',
 }
 
 export default function RegisterPage() {
   const [inviteToken, setInviteToken] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [teams, setTeams] = useState<CS2Team[]>([])
+  const [teamId, setTeamId] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    getTeams().then(setTeams).catch(() => {})
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -24,6 +32,7 @@ export default function RegisterPage() {
         inviteToken,
         username,
         password,
+        teamId: teamId || undefined,
       })
       setToken(res.data.token)
       navigate('/')
@@ -69,6 +78,19 @@ export default function RegisterPage() {
               minLength={8}
               required
             />
+          </div>
+          <div className="form-group">
+            <label htmlFor="teamId">Time (opcional)</label>
+            <select
+              id="teamId"
+              value={teamId}
+              onChange={e => setTeamId(e.target.value)}
+            >
+              <option value="">Selecione um time (opcional)</option>
+              {teams.map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
           </div>
           {error && <p role="alert">{error}</p>}
           <button type="submit" style={{ width: '100%', marginTop: '.5rem' }}>Criar Conta</button>

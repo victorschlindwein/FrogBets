@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using FrogBets.Api.Services;
 using FrogBets.Domain.Entities;
 using FrogBets.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
@@ -12,10 +13,12 @@ namespace FrogBets.Api.Controllers;
 public class UsersController : ControllerBase
 {
     private readonly FrogBetsDbContext _db;
+    private readonly ITeamMembershipService _teamMembershipService;
 
-    public UsersController(FrogBetsDbContext db)
+    public UsersController(FrogBetsDbContext db, ITeamMembershipService teamMembershipService)
     {
         _db = db;
+        _teamMembershipService = teamMembershipService;
     }
 
     /// <summary>POST /api/users/register — creates a new user with 1000 initial balance.</summary>
@@ -100,6 +103,43 @@ public class UsersController : ControllerBase
         });
     }
 
+    /// <summary>PATCH /api/users/{id}/team — admin or team leader: move user to a team (or remove).</summary>
+    [HttpPatch("{id:guid}/team")]
+    [Authorize]
+    public async Task<IActionResult> MoveUserTeam(Guid id, [FromBody] MoveUserTeamBody body)
+    {
+        var requesterId = GetCurrentUserId();
+        if (requesterId is null) return Unauthorized();
+
+        var requesterIsAdmin = User.FindFirstValue("isAdmin") == "true";
+
+        if (!requesterIsAdmin)
+        {
+            var requester = await _db.Users.AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == requesterId.Value);
+            if (requester is null || !requester.IsTeamLeader)
+                return StatusCode(403, new { error = new { code = "FORBIDDEN", message = "Acesso negado." } });
+        }
+
+        try
+        {
+            await _teamMembershipService.MoveUserAsync(requesterId.Value, requesterIsAdmin, id, body.TeamId);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "USER_NOT_FOUND")
+        {
+            return NotFound(new { error = new { code = ex.Message, message = "Usuário não encontrado." } });
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "TEAM_NOT_FOUND")
+        {
+            return NotFound(new { error = new { code = ex.Message, message = "Time não encontrado." } });
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "FORBIDDEN")
+        {
+            return StatusCode(403, new { error = new { code = ex.Message, message = "Acesso negado." } });
+        }
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private Guid? GetCurrentUserId()
@@ -111,3 +151,5 @@ public class UsersController : ControllerBase
 }
 
 public record RegisterRequest(string Username, string Password);
+
+public record MoveUserTeamBody(Guid? TeamId);

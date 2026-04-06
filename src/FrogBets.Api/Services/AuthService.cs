@@ -73,7 +73,7 @@ public class AuthService : IAuthService
 
     public bool IsTokenRevoked(string jti) => _blocklist.IsRevoked(jti);
 
-    public async Task<AuthResult> RegisterAsync(string username, string password, Guid inviteId)
+    public async Task<AuthResult> RegisterAsync(string username, string password, Guid inviteId, Guid? teamId = null)
     {
         if (password.Length < 8)
             throw new InvalidOperationException("PASSWORD_TOO_SHORT");
@@ -81,6 +81,13 @@ public class AuthService : IAuthService
         var exists = await _db.Users.AnyAsync(u => u.Username == username);
         if (exists)
             throw new InvalidOperationException("USERNAME_TAKEN");
+
+        if (teamId.HasValue)
+        {
+            var teamExists = await _db.CS2Teams.AnyAsync(t => t.Id == teamId.Value);
+            if (!teamExists)
+                throw new InvalidOperationException("TEAM_NOT_FOUND");
+        }
 
         var user = new FrogBets.Domain.Entities.User
         {
@@ -91,6 +98,7 @@ public class AuthService : IAuthService
             VirtualBalance  = 1000m,
             ReservedBalance = 0m,
             CreatedAt       = DateTime.UtcNow,
+            TeamId          = teamId,
         };
 
         _db.Users.Add(user);

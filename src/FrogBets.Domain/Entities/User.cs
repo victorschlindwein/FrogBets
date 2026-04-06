@@ -11,9 +11,12 @@ public class User
     public int WinsCount { get; set; }
     public int LossesCount { get; set; }
     public DateTime CreatedAt { get; set; }
+    public Guid? TeamId { get; set; }
+    public bool IsTeamLeader { get; set; } = false;
 
     // Navigation
     public ICollection<Bet> CreatedBets { get; set; } = new List<Bet>();
     public ICollection<Bet> CoveredBets { get; set; } = new List<Bet>();
     public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
+    public CS2Team? Team { get; set; }
 }

@@ -79,7 +79,7 @@ public class AuthController : ControllerBase
 
         try
         {
-            var result = await _authService.RegisterAsync(request.Username, request.Password, inviteId);
+            var result = await _authService.RegisterAsync(request.Username, request.Password, inviteId, request.TeamId);
             return Ok(new { token = result.Token, expiresAt = result.ExpiresAt });
         }
         catch (InvalidOperationException ex) when (ex.Message == "USERNAME_TAKEN")
@@ -90,8 +90,12 @@ public class AuthController : ControllerBase
         {
             return BadRequest(new { error = new { code = "PASSWORD_TOO_SHORT", message = "A senha deve ter no mínimo 8 caracteres." } });
         }
+        catch (InvalidOperationException ex) when (ex.Message == "TEAM_NOT_FOUND")
+        {
+            return BadRequest(new { error = new { code = "TEAM_NOT_FOUND", message = "Time não encontrado." } });
+        }
     }
 }
 
 public record LoginRequest(string Username, string Password);
-public record RegisterWithInviteRequest(string InviteToken, string Username, string Password);
+public record RegisterWithInviteRequest(string InviteToken, string Username, string Password, Guid? TeamId = null);

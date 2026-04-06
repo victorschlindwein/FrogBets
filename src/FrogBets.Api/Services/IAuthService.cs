@@ -21,7 +21,7 @@ public interface IAuthService
 
     /// <summary>
     /// Registers a new user with the given credentials and invite ID.
-    /// Throws InvalidOperationException with codes: USERNAME_TAKEN, PASSWORD_TOO_SHORT.
+    /// Throws InvalidOperationException with codes: USERNAME_TAKEN, PASSWORD_TOO_SHORT, TEAM_NOT_FOUND.
     /// </summary>
-    Task<AuthResult> RegisterAsync(string username, string password, Guid inviteId);
+    Task<AuthResult> RegisterAsync(string username, string password, Guid inviteId, Guid? teamId = null);
 }

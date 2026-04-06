@@ -42,6 +42,12 @@ builder.Services.AddScoped<IPlayerService, PlayerService>();
 // Match stats service
 builder.Services.AddScoped<IMatchStatsService, MatchStatsService>();
 
+// Team membership service
+builder.Services.AddScoped<ITeamMembershipService, TeamMembershipService>();
+
+// Trade service
+builder.Services.AddScoped<ITradeService, TradeService>();
+
 // JWT Bearer authentication
 var jwtSection = builder.Configuration.GetSection("Jwt");
 var key = Encoding.UTF8.GetBytes(jwtSection["Key"]!);

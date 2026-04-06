@@ -18,6 +18,8 @@ public class FrogBetsDbContext : DbContext
     public DbSet<CS2Team> CS2Teams => Set<CS2Team>();
     public DbSet<CS2Player> CS2Players => Set<CS2Player>();
     public DbSet<MatchStats> MatchStats => Set<MatchStats>();
+    public DbSet<TradeListing> TradeListings => Set<TradeListing>();
+    public DbSet<TradeOffer> TradeOffers => Set<TradeOffer>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -192,6 +194,59 @@ public class FrogBetsDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(s => s.GameId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // User → CS2Team FK (TeamId nullable, SetNull on delete)
+        modelBuilder.Entity<User>()
+            .HasOne(u => u.Team)
+            .WithMany()
+            .HasForeignKey(u => u.TeamId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // TradeListing
+        modelBuilder.Entity<TradeListing>(e =>
+        {
+            e.HasKey(tl => tl.Id);
+            e.HasIndex(tl => tl.UserId).IsUnique();
+
+            e.HasOne(tl => tl.User)
+                .WithMany()
+                .HasForeignKey(tl => tl.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(tl => tl.Team)
+                .WithMany()
+                .HasForeignKey(tl => tl.TeamId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // TradeOffer
+        modelBuilder.Entity<TradeOffer>(e =>
+        {
+            e.HasKey(o => o.Id);
+
+            e.Property(o => o.Status)
+                .HasConversion<string>();
+
+            e.HasOne(o => o.OfferedUser)
+                .WithMany()
+                .HasForeignKey(o => o.OfferedUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(o => o.TargetUser)
+                .WithMany()
+                .HasForeignKey(o => o.TargetUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(o => o.ProposerTeam)
+                .WithMany()
+                .HasForeignKey(o => o.ProposerTeamId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(o => o.ReceiverTeam)
+                .WithMany()
+                .HasForeignKey(o => o.ReceiverTeamId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

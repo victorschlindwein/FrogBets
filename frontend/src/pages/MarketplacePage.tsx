@@ -16,6 +16,34 @@ interface MarketplaceBet {
   market: Market
 }
 
+interface TradeListingItem {
+  userId: string
+  username: string
+  teamId: string
+  teamName: string
+  createdAt: string
+}
+
+interface TradeOffer {
+  id: string
+  offeredUserId: string
+  offeredUsername: string
+  targetUserId: string
+  targetUsername: string
+  proposerTeamName: string
+  receiverTeamName: string
+  status: string
+  createdAt: string
+}
+
+interface CurrentUser {
+  id: string
+  username: string
+  isAdmin: boolean
+  createdAt: string
+  isTeamLeader?: boolean
+}
+
 const MARKET_TYPE_LABELS: Record<string, string> = {
   MapWinner: 'Vencedor do Mapa',
   SeriesWinner: 'Vencedor da Série',
@@ -77,6 +105,186 @@ function BetRow({ bet, onCovered }: { bet: MarketplaceBet; onCovered: (id: strin
   )
 }
 
+function TradeSection() {
+  const [listings, setListings] = useState<TradeListingItem[]>([])
+  const [offers, setOffers] = useState<TradeOffer[]>([])
+  const [isTeamLeader, setIsTeamLeader] = useState(false)
+  const [loadingListings, setLoadingListings] = useState(true)
+  const [listingsError, setListingsError] = useState<string | null>(null)
+  const [offersError, setOffersError] = useState<string | null>(null)
+
+  // Form state
+  const [listingUserId, setListingUserId] = useState('')
+  const [offeredUserId, setOfferedUserId] = useState('')
+  const [targetUserId, setTargetUserId] = useState('')
+  const [formError, setFormError] = useState<string | null>(null)
+  const [formSuccess, setFormSuccess] = useState<string | null>(null)
+
+  useEffect(() => {
+    apiClient.get<CurrentUser>('/users/me')
+      .then(res => setIsTeamLeader(res.data.isTeamLeader ?? false))
+      .catch(() => setIsTeamLeader(false))
+
+    apiClient.get<TradeListingItem[]>('/trades/listings')
+      .then(res => setListings(res.data))
+      .catch(() => setListingsError('Erro ao carregar jogadores disponíveis.'))
+      .finally(() => setLoadingListings(false))
+  }, [])
+
+  useEffect(() => {
+    if (!isTeamLeader) return
+    apiClient.get<TradeOffer[]>('/trades/offers')
+      .then(res => setOffers(res.data))
+      .catch(() => setOffersError('Erro ao carregar ofertas.'))
+  }, [isTeamLeader])
+
+  async function handleAcceptOffer(id: string) {
+    try {
+      await apiClient.patch(`/trades/offers/${id}/accept`)
+      setOffers(prev => prev.filter(o => o.id !== id))
+    } catch {
+      setOffersError('Erro ao aceitar oferta.')
+    }
+  }
+
+  async function handleRejectOffer(id: string) {
+    try {
+      await apiClient.patch(`/trades/offers/${id}/reject`)
+      setOffers(prev => prev.filter(o => o.id !== id))
+    } catch {
+      setOffersError('Erro ao recusar oferta.')
+    }
+  }
+
+  async function handleAddListing(e: React.FormEvent) {
+    e.preventDefault()
+    setFormError(null)
+    setFormSuccess(null)
+    try {
+      await apiClient.post('/trades/listings', { userId: listingUserId })
+      setFormSuccess('Jogador disponibilizado para troca.')
+      setListingUserId('')
+      const res = await apiClient.get<TradeListingItem[]>('/trades/listings')
+      setListings(res.data)
+    } catch {
+      setFormError('Erro ao disponibilizar jogador.')
+    }
+  }
+
+  async function handleCreateOffer(e: React.FormEvent) {
+    e.preventDefault()
+    setFormError(null)
+    setFormSuccess(null)
+    try {
+      await apiClient.post('/trades/offers', { offeredUserId, targetUserId })
+      setFormSuccess('Oferta de troca criada.')
+      setOfferedUserId('')
+      setTargetUserId('')
+    } catch {
+      setFormError('Erro ao criar oferta de troca.')
+    }
+  }
+
+  // Group listings by team
+  const byTeam = listings.reduce<Record<string, TradeListingItem[]>>((acc, item) => {
+    if (!acc[item.teamName]) acc[item.teamName] = []
+    acc[item.teamName].push(item)
+    return acc
+  }, {})
+
+  return (
+    <div>
+      <h2>🔄 Trocas de Jogadores</h2>
+
+      <h3>Jogadores Disponíveis para Troca</h3>
+      {listingsError && <p role="alert">{listingsError}</p>}
+      {loadingListings ? (
+        <p>Carregando...</p>
+      ) : listings.length === 0 ? (
+        <p>Nenhum jogador disponível para troca.</p>
+      ) : (
+        Object.entries(byTeam).map(([teamName, members]) => (
+          <div key={teamName} style={{ marginBottom: '1rem' }}>
+            <strong>{teamName}</strong>
+            <ul>
+              {members.map(m => (
+                <li key={m.userId}>{m.username}</li>
+              ))}
+            </ul>
+          </div>
+        ))
+      )}
+
+      {isTeamLeader && (
+        <>
+          <h3>Minhas Ofertas Recebidas</h3>
+          {offersError && <p role="alert">{offersError}</p>}
+          {offers.filter(o => o.status === 'Pending').length === 0 ? (
+            <p>Nenhuma oferta pendente.</p>
+          ) : (
+            <ul>
+              {offers.filter(o => o.status === 'Pending').map(offer => (
+                <li key={offer.id} style={{ marginBottom: '.5rem' }}>
+                  <span>
+                    {offer.proposerTeamName} oferece <strong>{offer.offeredUsername}</strong> por <strong>{offer.targetUsername}</strong> ({offer.receiverTeamName})
+                  </span>
+                  <button className="btn-primary" onClick={() => handleAcceptOffer(offer.id)} style={{ marginLeft: '.5rem', padding: '.3rem .7rem', fontSize: '.85rem' }}>
+                    Aceitar
+                  </button>
+                  <button className="btn-secondary" onClick={() => handleRejectOffer(offer.id)} style={{ marginLeft: '.5rem', padding: '.3rem .7rem', fontSize: '.85rem' }}>
+                    Recusar
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <h3>Disponibilizar para Troca</h3>
+          <form onSubmit={handleAddListing} style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+            <input
+              type="text"
+              placeholder="ID do membro"
+              value={listingUserId}
+              onChange={e => setListingUserId(e.target.value)}
+              required
+              style={{ padding: '.4rem', flex: '1' }}
+            />
+            <button className="btn-primary" type="submit" style={{ padding: '.4rem .9rem' }}>
+              Disponibilizar
+            </button>
+          </form>
+
+          <h3>Criar Oferta de Troca</h3>
+          <form onSubmit={handleCreateOffer} style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+            <input
+              type="text"
+              placeholder="ID do jogador oferecido"
+              value={offeredUserId}
+              onChange={e => setOfferedUserId(e.target.value)}
+              required
+              style={{ padding: '.4rem', flex: '1' }}
+            />
+            <input
+              type="text"
+              placeholder="ID do jogador alvo"
+              value={targetUserId}
+              onChange={e => setTargetUserId(e.target.value)}
+              required
+              style={{ padding: '.4rem', flex: '1' }}
+            />
+            <button className="btn-primary" type="submit" style={{ padding: '.4rem .9rem' }}>
+              Criar Oferta
+            </button>
+          </form>
+
+          {formError && <p role="alert" style={{ marginTop: '.5rem' }}>{formError}</p>}
+          {formSuccess && <p style={{ marginTop: '.5rem', color: 'green' }}>{formSuccess}</p>}
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function MarketplacePage() {
   const [bets, setBets] = useState<MarketplaceBet[]>([])
   const [loading, setLoading] = useState(true)
@@ -104,6 +312,9 @@ export default function MarketplacePage() {
           ))}
         </ul>
       )}
+
+      <hr />
+      <TradeSection />
     </div>
   )
 }

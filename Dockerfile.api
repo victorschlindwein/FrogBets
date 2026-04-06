@@ -1,0 +1,24 @@
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /app
+
+COPY FrogBets.sln ./
+COPY src/FrogBets.Domain/FrogBets.Domain.csproj src/FrogBets.Domain/
+COPY src/FrogBets.Infrastructure/FrogBets.Infrastructure.csproj src/FrogBets.Infrastructure/
+COPY src/FrogBets.Api/FrogBets.Api.csproj src/FrogBets.Api/
+COPY tests/FrogBets.Tests/FrogBets.Tests.csproj tests/FrogBets.Tests/
+
+RUN dotnet restore
+
+COPY src/ src/
+COPY tests/ tests/
+
+RUN dotnet publish src/FrogBets.Api/FrogBets.Api.csproj -c Release -o /out
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+WORKDIR /app
+COPY --from=build /out .
+
+ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8080
+
+ENTRYPOINT ["dotnet", "FrogBets.Api.dll"]

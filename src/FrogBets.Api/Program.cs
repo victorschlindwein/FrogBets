@@ -72,6 +72,13 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
+// Auto-apply EF Core migrations on startup
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<FrogBetsDbContext>();
+    db.Database.Migrate();
+}
+
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();

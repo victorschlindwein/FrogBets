@@ -21,8 +21,10 @@ tools/SeedAdmin/
 
 # Env / secrets
 appsettings.Development.json
-*.env
-.env*
+appsettings.*.json
+.env
+.env.*
+!.env.example
 
 # OS
 .DS_Store

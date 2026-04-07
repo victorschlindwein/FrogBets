@@ -44,6 +44,8 @@ public class UsersController : ControllerBase
             isTeamLeader = user.IsTeamLeader,
             teamId       = user.TeamId,
             createdAt    = user.CreatedAt,
+            isMasterAdmin = !string.IsNullOrEmpty(_masterAdminUsername) &&
+                            user.Username.Equals(_masterAdminUsername, StringComparison.OrdinalIgnoreCase),
         });
     }
 
@@ -75,7 +77,7 @@ public class UsersController : ControllerBase
         var requesterId = GetCurrentUserId();
         if (requesterId is null) return Unauthorized();
 
-        var requesterIsAdmin = User.FindFirstValue("isAdmin") == "true";
+        var requesterIsAdmin = await IsAdminFromDb();
 
         if (!requesterIsAdmin)
         {
@@ -109,7 +111,7 @@ public class UsersController : ControllerBase
     [Authorize]
     public async Task<IActionResult> ListUsers()
     {
-        if (User.FindFirstValue("isAdmin") != "true")
+        if (!await IsAdminFromDb())
             return StatusCode(403, new { error = new { code = "FORBIDDEN", message = "Acesso negado." } });
 
         var users = await _db.Users.AsNoTracking()
@@ -133,7 +135,7 @@ public class UsersController : ControllerBase
     [Authorize]
     public async Task<IActionResult> PromoteToAdmin(Guid id)
     {
-        if (User.FindFirstValue("isAdmin") != "true")
+        if (!await IsAdminFromDb())
             return StatusCode(403, new { error = new { code = "FORBIDDEN", message = "Acesso negado." } });
 
         var target = await _db.Users.FirstOrDefaultAsync(u => u.Id == id);
@@ -150,7 +152,7 @@ public class UsersController : ControllerBase
     [Authorize]
     public async Task<IActionResult> DemoteFromAdmin(Guid id)
     {
-        if (User.FindFirstValue("isAdmin") != "true")
+        if (!await IsAdminFromDb())
             return StatusCode(403, new { error = new { code = "FORBIDDEN", message = "Acesso negado." } });
 
         var target = await _db.Users.FirstOrDefaultAsync(u => u.Id == id);
@@ -174,6 +176,14 @@ public class UsersController : ControllerBase
         var sub = User.FindFirstValue(ClaimTypes.NameIdentifier)
                ?? User.FindFirstValue("sub");
         return Guid.TryParse(sub, out var id) ? id : null;
+    }
+
+    private async Task<bool> IsAdminFromDb()
+    {
+        var userId = GetCurrentUserId();
+        if (userId is null) return false;
+        return await _db.Users.AsNoTracking()
+            .AnyAsync(u => u.Id == userId.Value && u.IsAdmin);
     }
 }
 

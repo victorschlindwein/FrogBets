@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using FrogBets.Api.Services;
+using FrogBets.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace FrogBets.Api.Controllers;
 
@@ -11,11 +13,13 @@ public class TeamsController : ControllerBase
 {
     private readonly ITeamService _teamService;
     private readonly ITeamMembershipService _teamMembershipService;
+    private readonly FrogBetsDbContext _db;
 
-    public TeamsController(ITeamService teamService, ITeamMembershipService teamMembershipService)
+    public TeamsController(ITeamService teamService, ITeamMembershipService teamMembershipService, FrogBetsDbContext db)
     {
         _teamService = teamService;
         _teamMembershipService = teamMembershipService;
+        _db = db;
     }
 
     /// <summary>POST /api/teams — admin: create a new team.</summary>
@@ -23,7 +27,7 @@ public class TeamsController : ControllerBase
     [Authorize]
     public async Task<IActionResult> CreateTeam([FromBody] CreateTeamBody body)
     {
-        if (!IsAdmin()) return Forbid();
+        if (!await IsAdminFromDb()) return Forbid();
 
         try
         {
@@ -54,7 +58,7 @@ public class TeamsController : ControllerBase
     [Authorize]
     public async Task<IActionResult> AssignLeader(Guid teamId, Guid userId)
     {
-        if (!IsAdmin()) return Forbid();
+        if (!await IsAdminFromDb()) return Forbid();
 
         try
         {
@@ -84,7 +88,7 @@ public class TeamsController : ControllerBase
     [Authorize]
     public async Task<IActionResult> RemoveLeader(Guid teamId)
     {
-        if (!IsAdmin()) return Forbid();
+        if (!await IsAdminFromDb()) return Forbid();
 
         try
         {
@@ -97,10 +101,32 @@ public class TeamsController : ControllerBase
         }
     }
 
+    /// <summary>DELETE /api/teams/{teamId} — admin: soft-delete a team.</summary>
+    [HttpDelete("{teamId:guid}")]
+    [Authorize]
+    public async Task<IActionResult> DeleteTeam(Guid teamId)
+    {
+        if (!await IsAdminFromDb()) return Forbid();
+
+        try
+        {
+            await _teamService.DeleteTeamAsync(teamId);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "TEAM_NOT_FOUND")
+        {
+            return NotFound(new { error = new { code = ex.Message, message = "Time não encontrado." } });
+        }
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
-    private bool IsAdmin() =>
-        User.FindFirstValue("isAdmin") == "true";
+    private async Task<bool> IsAdminFromDb()
+    {
+        var sub = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (!Guid.TryParse(sub, out var userId)) return false;
+        return await _db.Users.AsNoTracking().AnyAsync(u => u.Id == userId && u.IsAdmin);
+    }
 }
 
 public record CreateTeamBody(string Name, string? LogoUrl);

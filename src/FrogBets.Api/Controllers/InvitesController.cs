@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using FrogBets.Api.Services;
+using FrogBets.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace FrogBets.Api.Controllers;
 
@@ -11,17 +13,19 @@ namespace FrogBets.Api.Controllers;
 public class InvitesController : ControllerBase
 {
     private readonly IInviteService _inviteService;
+    private readonly FrogBetsDbContext _db;
 
-    public InvitesController(IInviteService inviteService)
+    public InvitesController(IInviteService inviteService, FrogBetsDbContext db)
     {
         _inviteService = inviteService;
+        _db = db;
     }
 
     /// <summary>POST /api/invites — admin: generate a new invite token.</summary>
     [HttpPost]
     public async Task<IActionResult> CreateInvite([FromBody] CreateInviteRequest request)
     {
-        if (!IsAdmin()) return Forbid();
+        if (!await IsAdminFromDb()) return Forbid();
 
         var result = await _inviteService.GenerateAsync(request.ExpiresAt, request.Description);
         return StatusCode(201, ToResponse(result));
@@ -31,7 +35,7 @@ public class InvitesController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetInvites()
     {
-        if (!IsAdmin()) return Forbid();
+        if (!await IsAdminFromDb()) return Forbid();
 
         var invites = await _inviteService.GetAllAsync();
         return Ok(invites.Select(ToResponse));
@@ -41,7 +45,7 @@ public class InvitesController : ControllerBase
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> RevokeInvite(Guid id)
     {
-        if (!IsAdmin()) return Forbid();
+        if (!await IsAdminFromDb()) return Forbid();
 
         try
         {
@@ -64,6 +68,13 @@ public class InvitesController : ControllerBase
 
     private bool IsAdmin() =>
         User.FindFirstValue("isAdmin") == "true";
+
+    private async Task<bool> IsAdminFromDb()
+    {
+        var sub = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (!Guid.TryParse(sub, out var userId)) return false;
+        return await _db.Users.AsNoTracking().AnyAsync(u => u.Id == userId && u.IsAdmin);
+    }
 
     private static InviteResponse ToResponse(InviteResult r) =>
         new(r.Id, r.Token, r.Description, r.ExpiresAt, r.CreatedAt, r.Status.ToString());

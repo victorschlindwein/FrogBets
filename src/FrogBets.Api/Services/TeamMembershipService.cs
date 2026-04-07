@@ -14,7 +14,7 @@ public class TeamMembershipService : ITeamMembershipService
 
     public async Task AssignLeaderAsync(Guid teamId, Guid userId)
     {
-        var team = await _db.CS2Teams.FirstOrDefaultAsync(t => t.Id == teamId)
+        var team = await _db.CS2Teams.FirstOrDefaultAsync(t => t.Id == teamId && !t.IsDeleted)
             ?? throw new InvalidOperationException("TEAM_NOT_FOUND");
 
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId)
@@ -44,7 +44,7 @@ public class TeamMembershipService : ITeamMembershipService
 
     public async Task RemoveLeaderAsync(Guid teamId)
     {
-        _ = await _db.CS2Teams.FirstOrDefaultAsync(t => t.Id == teamId)
+        _ = await _db.CS2Teams.FirstOrDefaultAsync(t => t.Id == teamId && !t.IsDeleted)
             ?? throw new InvalidOperationException("TEAM_NOT_FOUND");
 
         var leader = await _db.Users
@@ -73,7 +73,7 @@ public class TeamMembershipService : ITeamMembershipService
 
         if (destinationTeamId.HasValue)
         {
-            _ = await _db.CS2Teams.FirstOrDefaultAsync(t => t.Id == destinationTeamId.Value)
+            _ = await _db.CS2Teams.FirstOrDefaultAsync(t => t.Id == destinationTeamId.Value && !t.IsDeleted)
                 ?? throw new InvalidOperationException("TEAM_NOT_FOUND");
         }
 

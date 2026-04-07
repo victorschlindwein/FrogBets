@@ -40,10 +40,22 @@ public class TeamService : ITeamService
     {
         var teams = await _db.CS2Teams
             .AsNoTracking()
+            .Where(t => !t.IsDeleted)
             .OrderBy(t => t.Name)
             .ToListAsync();
 
         return teams.Select(ToDto).ToList();
+    }
+
+    public async Task DeleteTeamAsync(Guid teamId)
+    {
+        var team = await _db.CS2Teams.FirstOrDefaultAsync(t => t.Id == teamId && !t.IsDeleted)
+            ?? throw new InvalidOperationException("TEAM_NOT_FOUND");
+
+        team.IsDeleted = true;
+        team.DeletedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync();
     }
 
     private static CS2TeamDto ToDto(CS2Team t) =>

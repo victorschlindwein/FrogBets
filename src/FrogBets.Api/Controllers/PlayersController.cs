@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using FrogBets.Api.Services;
+using FrogBets.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace FrogBets.Api.Controllers;
 
@@ -11,11 +13,13 @@ public class PlayersController : ControllerBase
 {
     private readonly IPlayerService _playerService;
     private readonly IMatchStatsService _matchStatsService;
+    private readonly FrogBetsDbContext _db;
 
-    public PlayersController(IPlayerService playerService, IMatchStatsService matchStatsService)
+    public PlayersController(IPlayerService playerService, IMatchStatsService matchStatsService, FrogBetsDbContext db)
     {
         _playerService = playerService;
         _matchStatsService = matchStatsService;
+        _db = db;
     }
 
     /// <summary>POST /api/players — admin: create a new player.</summary>
@@ -23,7 +27,7 @@ public class PlayersController : ControllerBase
     [Authorize]
     public async Task<IActionResult> CreatePlayer([FromBody] CreatePlayerBody body)
     {
-        if (!IsAdmin()) return Forbid();
+        if (!await IsAdminFromDb()) return Forbid();
 
         try
         {
@@ -50,7 +54,7 @@ public class PlayersController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetPlayers()
     {
-        if (!IsAdmin()) return Forbid();
+        if (!await IsAdminFromDb()) return Forbid();
 
         var players = await _playerService.GetPlayersAsync();
         return Ok(players);
@@ -70,7 +74,7 @@ public class PlayersController : ControllerBase
     [Authorize]
     public async Task<IActionResult> RegisterStats(Guid id, [FromBody] RegisterStatsBody body)
     {
-        if (!IsAdmin()) return Forbid();
+        if (!await IsAdminFromDb()) return Forbid();
 
         try
         {
@@ -108,6 +112,13 @@ public class PlayersController : ControllerBase
 
     private bool IsAdmin() =>
         User.FindFirstValue("isAdmin") == "true";
+
+    private async Task<bool> IsAdminFromDb()
+    {
+        var sub = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (!Guid.TryParse(sub, out var userId)) return false;
+        return await _db.Users.AsNoTracking().AnyAsync(u => u.Id == userId && u.IsAdmin);
+    }
 }
 
 public record CreatePlayerBody(string Nickname, string? RealName, Guid TeamId, string? PhotoUrl);

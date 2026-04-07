@@ -36,7 +36,7 @@ public class TradesController : ControllerBase
         var requesterId = GetCurrentUserId();
         if (requesterId is null) return Unauthorized();
 
-        if (!IsAdmin() && !await IsTeamLeaderAsync(requesterId.Value))
+        if (!await IsAdminFromDb() && !await IsTeamLeaderAsync(requesterId.Value))
             return StatusCode(403, new { error = new { code = "FORBIDDEN", message = "Acesso negado." } });
 
         try
@@ -69,7 +69,7 @@ public class TradesController : ControllerBase
         var requesterId = GetCurrentUserId();
         if (requesterId is null) return Unauthorized();
 
-        if (!IsAdmin() && !await IsTeamLeaderAsync(requesterId.Value))
+        if (!await IsAdminFromDb() && !await IsTeamLeaderAsync(requesterId.Value))
             return StatusCode(403, new { error = new { code = "FORBIDDEN", message = "Acesso negado." } });
 
         try
@@ -112,7 +112,7 @@ public class TradesController : ControllerBase
         var requesterId = GetCurrentUserId();
         if (requesterId is null) return Unauthorized();
 
-        if (!IsAdmin() && !await IsTeamLeaderAsync(requesterId.Value))
+        if (!await IsAdminFromDb() && !await IsTeamLeaderAsync(requesterId.Value))
             return StatusCode(403, new { error = new { code = "FORBIDDEN", message = "Acesso negado." } });
 
         try
@@ -206,7 +206,7 @@ public class TradesController : ControllerBase
     [HttpPost("direct")]
     public async Task<IActionResult> DirectSwap([FromBody] DirectSwapBody body)
     {
-        if (!IsAdmin())
+        if (!await IsAdminFromDb())
             return StatusCode(403, new { error = new { code = "FORBIDDEN", message = "Acesso negado." } });
 
         try
@@ -239,6 +239,13 @@ public class TradesController : ControllerBase
 
     private bool IsAdmin() =>
         User.FindFirstValue("isAdmin") == "true";
+
+    private async Task<bool> IsAdminFromDb()
+    {
+        var sub = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (!Guid.TryParse(sub, out var userId)) return false;
+        return await _db.Users.AsNoTracking().AnyAsync(u => u.Id == userId && u.IsAdmin);
+    }
 
     private async Task<bool> IsTeamLeaderAsync(Guid userId) =>
         await _db.Users

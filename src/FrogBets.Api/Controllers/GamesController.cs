@@ -1,8 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using FrogBets.Api.Services;
+using FrogBets.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace FrogBets.Api.Controllers;
 
@@ -11,10 +13,12 @@ namespace FrogBets.Api.Controllers;
 public class GamesController : ControllerBase
 {
     private readonly IGameService _gameService;
+    private readonly FrogBetsDbContext _db;
 
-    public GamesController(IGameService gameService)
+    public GamesController(IGameService gameService, FrogBetsDbContext db)
     {
         _gameService = gameService;
+        _db = db;
     }
 
     /// <summary>GET /api/games — public listing of all games.</summary>
@@ -42,7 +46,7 @@ public class GamesController : ControllerBase
     [Authorize]
     public async Task<IActionResult> CreateGame([FromBody] CreateGameBody body)
     {
-        if (!IsAdmin()) return Forbid();
+        if (!await IsAdminFromDb()) return Forbid();
 
         var gameId = await _gameService.CreateGameAsync(
             new CreateGameRequest(body.TeamA, body.TeamB, body.ScheduledAt, body.NumberOfMaps));
@@ -55,7 +59,7 @@ public class GamesController : ControllerBase
     [Authorize]
     public async Task<IActionResult> StartGame(Guid id)
     {
-        if (!IsAdmin()) return Forbid();
+        if (!await IsAdminFromDb()) return Forbid();
 
         try
         {
@@ -73,7 +77,7 @@ public class GamesController : ControllerBase
     [Authorize]
     public async Task<IActionResult> RegisterResult(Guid id, [FromBody] RegisterResultBody body)
     {
-        if (!IsAdmin()) return Forbid();
+        if (!await IsAdminFromDb()) return Forbid();
 
         var adminId = GetCurrentUserId();
         if (adminId is null) return Unauthorized();
@@ -108,6 +112,13 @@ public class GamesController : ControllerBase
 
     private bool IsAdmin() =>
         User.FindFirstValue("isAdmin") == "true";
+
+    private async Task<bool> IsAdminFromDb()
+    {
+        var sub = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (!Guid.TryParse(sub, out var userId)) return false;
+        return await _db.Users.AsNoTracking().AnyAsync(u => u.Id == userId && u.IsAdmin);
+    }
 
     private Guid? GetCurrentUserId()
     {

@@ -16,3 +16,7 @@ CREATE TABLE IF NOT EXISTS "Invites" (
     CONSTRAINT "PK_Invites" PRIMARY KEY ("Id")
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "IX_Invites_Token" ON "Invites"("Token");
+
+-- Migration: AddTeamSoftDelete
+ALTER TABLE "CS2Teams" ADD COLUMN IF NOT EXISTS "IsDeleted" boolean NOT NULL DEFAULT false;
+ALTER TABLE "CS2Teams" ADD COLUMN IF NOT EXISTS "DeletedAt" timestamptz;

@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import apiClient from '../api/client'
 import { getTeams, createTeam, CS2Team, getPlayers, createPlayer, CS2Player, registerMatchStats } from '../api/players'
 
-interface User { id: string; username: string; isAdmin: boolean }
+interface User { id: string; username: string; isAdmin: boolean; isMasterAdmin?: boolean }
 interface Invite {
   id: string; token: string; description: string | null
   expiresAt: string; createdAt: string; status: 'Pending' | 'Used' | 'Expired'
@@ -23,7 +23,7 @@ function marketLabel(m: Market) {
 }
 
 // ── Índice de navegação ───────────────────────────────────────────────────
-const NAV_ITEMS = [
+const NAV_ITEMS_MASTER = [
   { id: 'sec-users',       label: '👥 Usuários' },
   { id: 'sec-admins',      label: '🔐 Admins' },
   { id: 'sec-games',       label: '🎮 Cadastrar Jogo' },
@@ -37,12 +37,25 @@ const NAV_ITEMS = [
   { id: 'sec-swap',        label: '🔄 Troca Direta' },
 ]
 
-function AdminNav() {
+const NAV_ITEMS_PROMOTED = [
+  { id: 'sec-games',       label: '🎮 Cadastrar Jogo' },
+  { id: 'sec-start',       label: '▶️ Iniciar Jogo' },
+  { id: 'sec-result',      label: '🏁 Registrar Resultado' },
+  { id: 'sec-invites',     label: '🎟️ Convites' },
+  { id: 'sec-teams',       label: '🛡️ Times' },
+  { id: 'sec-players',     label: '👤 Jogadores' },
+  { id: 'sec-stats',       label: '📊 Estatísticas' },
+  { id: 'sec-leaders',     label: '👑 Gestão de Líderes' },
+  { id: 'sec-swap',        label: '🔄 Troca Direta' },
+]
+
+function AdminNav({ isMasterAdmin }: { isMasterAdmin: boolean }) {
+  const items = isMasterAdmin ? NAV_ITEMS_MASTER : NAV_ITEMS_PROMOTED
   return (
     <nav className="admin-index card">
       <strong>Índice</strong>
       <ul>
-        {NAV_ITEMS.map(item => (
+        {items.map(item => (
           <li key={item.id}>
             <a href={`#${item.id}`}>{item.label}</a>
           </li>
@@ -566,6 +579,17 @@ function TeamsSection({ onTeamsChange }: { onTeamsChange: (teams: CS2Team[]) => 
     } finally { setSubmitting(false) }
   }
 
+  async function handleDelete(teamId: string, teamName: string) {
+    if (!confirm(`Remover o time "${teamName}"? Esta ação não pode ser desfeita.`)) return
+    try {
+      await apiClient.delete(`/teams/${teamId}`)
+      loadTeams()
+    } catch (err: unknown) {
+      const e2 = err as { response?: { data?: { error?: { message?: string } } } }
+      alert(e2.response?.data?.error?.message ?? 'Erro ao remover time.')
+    }
+  }
+
   return (
     <section id="sec-teams">
       <h2>🛡️ Times</h2>
@@ -588,7 +612,7 @@ function TeamsSection({ onTeamsChange }: { onTeamsChange: (teams: CS2Team[]) => 
         <div className="card" style={{ padding: 0, overflow: 'hidden', marginTop: '1rem' }}>
           <div className="table-wrapper">
           <table>
-            <thead><tr><th>Nome</th><th>Logo</th><th>Criado em</th></tr></thead>
+            <thead><tr><th>Nome</th><th>Logo</th><th>Criado em</th><th>Ação</th></tr></thead>
             <tbody>
               {teams.map(team => (
                 <tr key={team.id}>
@@ -604,6 +628,16 @@ function TeamsSection({ onTeamsChange }: { onTeamsChange: (teams: CS2Team[]) => 
                       : '—'}
                   </td>
                   <td>{new Date(team.createdAt).toLocaleString('pt-BR')}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="btn-danger"
+                      onClick={() => handleDelete(team.id, team.name)}
+                      style={{ padding: '.3rem .7rem', fontSize: '.8rem' }}
+                    >
+                      Remover
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -969,7 +1003,7 @@ export default function AdminPage() {
     apiClient.get<User>('/users/me')
       .then(res => {
         if (!res.data.isAdmin) { setAccessDenied(true) }
-        else { setUser(res.data); loadGames(); loadUsers() }
+        else { setUser(res.data); loadGames(); if (res.data.isMasterAdmin) loadUsers() }
       })
       .catch(() => setAccessDenied(true))
       .finally(() => setLoading(false))
@@ -978,12 +1012,14 @@ export default function AdminPage() {
   if (loading) return <div className="page"><div className="card empty-card"><p>Carregando...</p></div></div>
   if (accessDenied || !user) return <div className="page"><div className="card empty-card"><p role="alert">Acesso negado.</p></div></div>
 
+  const isMasterAdmin = user.isMasterAdmin ?? false
+
   return (
     <div className="page page-admin">
       <h1>⚙️ Administração</h1>
-      <AdminNav />
-      <UsersSection currentUser={user} />
-      <AdminManagementSection users={users} currentUser={user} onUsersChange={loadUsers} />
+      <AdminNav isMasterAdmin={isMasterAdmin} />
+      {isMasterAdmin && <UsersSection currentUser={user} />}
+      {isMasterAdmin && <AdminManagementSection users={users} currentUser={user} onUsersChange={loadUsers} />}
       <CreateGameForm teams={teams} onCreated={loadGames} />
       <StartGameSection games={games} onStarted={loadGames} />
       <RegisterResultSection games={games} />

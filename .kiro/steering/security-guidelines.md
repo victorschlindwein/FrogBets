@@ -42,6 +42,11 @@ O commit `fae0fad` (commit inicial) expôs valores placeholder no `appsettings.j
 
 Esses valores foram removidos no commit `0273b23`. Como o repositório é público, qualquer novo desenvolvedor deve saber que esses valores **nunca foram usados em produção** — são apenas defaults de desenvolvimento local.
 
+## Geração de Tokens
+
+- Tokens de convite usam `RandomNumberGenerator.GetBytes(16)` convertido para hex — criptograficamente seguro
+- Nunca usar `Guid.NewGuid().ToString()` para tokens de segurança
+
 ## Ao Adicionar Novos Endpoints
 
 - Endpoints admin: verificar `User.FindFirstValue("isAdmin") == "true"` e retornar `403 Forbid()` se não for admin.

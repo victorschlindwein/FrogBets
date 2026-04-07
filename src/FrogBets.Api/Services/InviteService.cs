@@ -2,6 +2,7 @@ using FrogBets.Domain.Entities;
 using FrogBets.Domain.Enums;
 using FrogBets.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
 
 namespace FrogBets.Api.Services;
 
@@ -19,7 +20,7 @@ public class InviteService : IInviteService
         var invite = new Invite
         {
             Id = Guid.NewGuid(),
-            Token = Guid.NewGuid().ToString("N"),
+            Token = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLower(),
             Description = description,
             ExpiresAt = expiresAt,
             CreatedAt = DateTime.UtcNow

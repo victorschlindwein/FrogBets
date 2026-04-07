@@ -26,6 +26,17 @@ public class GamesController : ControllerBase
         return Ok(games);
     }
 
+    /// <summary>GET /api/games/{id} — public: get a single game with its markets.</summary>
+    [HttpGet("{id:guid}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetGame(Guid id)
+    {
+        var game = await _gameService.GetGameByIdAsync(id);
+        if (game is null)
+            return NotFound(new { error = new { code = "GAME_NOT_FOUND", message = "Jogo não encontrado." } });
+        return Ok(game);
+    }
+
     /// <summary>POST /api/games — admin: create a new game with auto-generated markets.</summary>
     [HttpPost]
     [Authorize]

@@ -66,14 +66,6 @@ public class SettlementService : ISettlementService
         }
 
         await _db.SaveChangesAsync();
-
-        // Check if all markets for the game are Settled or Voided → finish the game
-        var game = market.Game;
-        if (game.Markets.All(m => m.Status is MarketStatus.Settled or MarketStatus.Voided))
-        {
-            game.Status = GameStatus.Finished;
-            await _db.SaveChangesAsync();
-        }
     }
 
     /// <summary>

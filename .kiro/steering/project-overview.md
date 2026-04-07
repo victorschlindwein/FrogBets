@@ -36,3 +36,9 @@ A plataforma é **fechada por convite**. O único ponto de entrada para novos us
 ## Primeiro Admin
 
 O primeiro usuário admin deve ser inserido diretamente no banco via SQL (ver README.md). Após isso, o admin usa o painel para gerar convites.
+
+## Ambiente do Desenvolvedor
+
+- **Shell:** PowerShell (win32)
+- **NUNCA** usar `\` para quebrar linhas em comandos de terminal. PowerShell não suporta isso.
+- Sempre escrever comandos em uma única linha, sem quebras com `\` ou `` ` ``.

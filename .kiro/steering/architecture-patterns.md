@@ -112,3 +112,36 @@ public Property NomeDaPropriedade()
 ```
 
 Cada spec deve ter seus property-tests cobrindo todas as propriedades de corretude definidas no `design.md`.
+
+## Deploy e Infraestrutura
+
+### Docker
+
+- Frontend usa `nginxinc/nginx-unprivileged:alpine` — imagem já configurada para rodar sem root no Fargate
+- Nunca usar `nginx:alpine` puro para o frontend: a porta 80 requer root e falha no ECS Fargate
+- Frontend escuta na porta **8080** (não 80)
+- API escuta na porta **8080** via Kestrel
+
+### AWS ECS Fargate
+
+- Cluster: `frogbets`, região `sa-east-1`
+- Serviços: `frogbets-api`, `frogbets-frontend`
+- Target group do frontend aponta para porta **8080**
+- O security group `frogbets-ecs-sg` libera as portas 8080 e 80 vindas do ALB SG
+- Migrations EF Core são aplicadas automaticamente no startup via `db.Database.Migrate()`
+
+### Comandos AWS úteis (PowerShell — sem quebra de linha com \)
+
+```powershell
+# Ver status do serviço
+aws ecs describe-services --cluster frogbets --services frogbets-frontend --region sa-east-1 --query 'services[0].events[:5]'
+
+# Ver tasks paradas (crash)
+aws ecs list-tasks --cluster frogbets --service-name frogbets-frontend --region sa-east-1 --desired-status STOPPED
+
+# Ver motivo do crash
+aws ecs describe-tasks --cluster frogbets --tasks <task-arn> --region sa-east-1 --query 'tasks[0].{stopCode:stopCode,stoppedReason:stoppedReason,container:containers[0].{reason:reason,exitCode:exitCode}}'
+
+# Ver logs do container
+aws logs get-log-events --log-group-name /ecs/frogbets-frontend --log-stream-name <stream> --region sa-east-1 --limit 50 --query 'events[*].message' --output text
+```

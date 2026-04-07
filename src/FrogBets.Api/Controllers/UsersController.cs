@@ -35,10 +35,12 @@ public class UsersController : ControllerBase
 
         return Ok(new
         {
-            id        = user.Id,
-            username  = user.Username,
-            isAdmin   = user.IsAdmin,
-            createdAt = user.CreatedAt,
+            id           = user.Id,
+            username     = user.Username,
+            isAdmin      = user.IsAdmin,
+            isTeamLeader = user.IsTeamLeader,
+            teamId       = user.TeamId,
+            createdAt    = user.CreatedAt,
         });
     }
 

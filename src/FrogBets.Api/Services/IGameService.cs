@@ -17,6 +17,11 @@ public interface IGameService
     Task<IReadOnlyList<GameDto>> GetGamesAsync();
 
     /// <summary>
+    /// Returns a single game by ID, or null if not found.
+    /// </summary>
+    Task<GameDto?> GetGameByIdAsync(Guid gameId);
+
+    /// <summary>
     /// Sets game status to InProgress and closes all Open markets.
     /// </summary>
     Task StartGameAsync(Guid gameId);

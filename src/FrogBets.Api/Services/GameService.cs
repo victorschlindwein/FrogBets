@@ -84,6 +84,17 @@ public class GameService : IGameService
     }
 
     /// <inheritdoc/>
+    public async Task<GameDto?> GetGameByIdAsync(Guid gameId)
+    {
+        var game = await _db.Games
+            .AsNoTracking()
+            .Include(g => g.Markets)
+            .FirstOrDefaultAsync(g => g.Id == gameId);
+
+        return game is null ? null : ToDto(game);
+    }
+
+    /// <inheritdoc/>
     public async Task StartGameAsync(Guid gameId)
     {
         var game = await _db.Games

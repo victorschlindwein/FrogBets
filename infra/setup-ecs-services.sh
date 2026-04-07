@@ -73,7 +73,7 @@ API_TG_ARN=$(aws elbv2 create-target-group \
 FRONTEND_TG_ARN=$(aws elbv2 create-target-group \
   --name "${APP_NAME}-frontend-tg" \
   --protocol HTTP \
-  --port 80 \
+  --port 8080 \
   --vpc-id "$VPC_ID" \
   --target-type ip \
   --health-check-path "/" \
@@ -145,7 +145,7 @@ aws ecs create-service \
   --desired-count 1 \
   --launch-type FARGATE \
   --network-configuration "awsvpcConfiguration={subnets=[$SUBNET_CSV],securityGroups=[$ECS_SG],assignPublicIp=ENABLED}" \
-  --load-balancers "targetGroupArn=$FRONTEND_TG_ARN,containerName=frogbets-frontend,containerPort=80" \
+  --load-balancers "targetGroupArn=$FRONTEND_TG_ARN,containerName=frogbets-frontend,containerPort=8080" \
   --region "$AWS_REGION" \
   --output none 2>/dev/null || \
 aws ecs update-service \

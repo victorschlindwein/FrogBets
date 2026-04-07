@@ -263,7 +263,7 @@ cat > infra/ecs-task-frontend.json << EOF
   "containerDefinitions": [{
     "name": "frogbets-frontend",
     "image": "${ECR_REGISTRY}/frogbets-frontend:latest",
-    "portMappings": [{"containerPort": 80, "protocol": "tcp"}],
+    "portMappings": [{"containerPort": 8080, "protocol": "tcp"}],
     "logConfiguration": {
       "logDriver": "awslogs",
       "options": {

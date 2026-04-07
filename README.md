@@ -18,16 +18,44 @@ O FrogBets resolve tudo isso em uma aplicação web self-hosted, sem dinheiro re
 
 ## Funcionalidades
 
-- Registro via convite (sistema de invite codes) com seleção opcional de time no cadastro
-- Apostas P2P: qualquer usuário autenticado cria e cobre apostas em mercados de partidas
-- Mercados de apostas criados por admins (ex: "Quem vence o mapa 1?")
-- Liquidação automática de apostas após resultado ser registrado
-- Leaderboard com saldo virtual, vitórias e derrotas
-- Ranking de jogadores por performance (Rating 2.0 adaptado do HLTV)
-- Painel administrativo para gerenciar jogos, times, jogadores e resultados
-- Notificações in-app
-- Times de usuários: cada usuário pode pertencer a um time, com papel de líder de time
-- Marketplace de trocas: líderes de time podem disponibilizar membros para troca, criar e aceitar ofertas entre times
+### Apostas P2P
+- Qualquer usuário autenticado pode criar uma aposta em um mercado aberto, escolhendo uma opção e um valor
+- Outros usuários cobrem apostas pendentes — a opção do cobrador é sempre o oposto da do criador (atribuída automaticamente)
+- Ao criar ou cobrir uma aposta, o valor é movido de `VirtualBalance` para `ReservedBalance` — o saldo total nunca muda
+- Apostas pendentes podem ser canceladas pelo criador antes de serem cobertas
+- Marketplace: lista todas as apostas pendentes de outros usuários disponíveis para cobertura
+
+### Jogos e Mercados
+- Admins criam jogos (séries de CS2) informando os times, data e número de mapas
+- Ao criar um jogo com N mapas, o sistema gera automaticamente todos os mercados: N × {Vencedor do Mapa, Top Kills, Mais Mortes, Maior Dano por Utilitários} + 1 × Vencedor da Série
+- Admin inicia o jogo (mercados ficam fechados para novas apostas) e registra os resultados por mercado
+- Ao registrar um resultado, todas as apostas ativas do mercado são liquidadas automaticamente: vencedor recebe 2× o valor apostado, perdedor perde o valor reservado
+
+### Leaderboard
+- Ranking de apostadores por saldo virtual acumulado
+- Exibe saldo disponível, saldo reservado, vitórias e derrotas de cada usuário
+
+### Sistema de Rating de Jogadores (CS2)
+- Admins cadastram times e jogadores de CS2
+- Para cada partida, o admin registra o `MapResult` (mapa + número de rounds) e depois as estatísticas individuais de cada jogador naquele mapa (kills, deaths, assists, dano total, KAST%)
+- O rating é calculado por mapa usando a fórmula HLTV Rating 2.0 adaptada e acumulado no `PlayerScore` do jogador
+- Ranking público de jogadores por performance
+
+### Times e Marketplace de Trocas
+- Cada usuário pode pertencer a um time, com papel de líder de time
+- Líderes podem marcar membros como disponíveis para troca e criar/aceitar ofertas entre times
+- Admins podem realizar trocas diretas sem necessidade de oferta formal
+
+### Acesso e Segurança
+- Plataforma fechada por convite — o único caminho para criar conta é via token de convite gerado por admin
+- JWT com expiração de 60 minutos e logout real (token adicionado à blocklist)
+- Rate limiting nos endpoints de autenticação (5 tentativas por 15 minutos por IP)
+- Auditoria automática de todas as operações de escrita
+
+### Painel Administrativo
+- Interface web completa para gerenciar jogos, times, jogadores, convites, resultados e estatísticas
+- Dropdowns com dados reais (sem necessidade de copiar/colar UUIDs)
+- Gestão de líderes de time e trocas diretas entre membros
 
 ---
 
@@ -145,7 +173,7 @@ Após isso, use o painel admin para gerar convites para os demais usuários.
 dotnet test --configuration Release --verbosity quiet
 ```
 
-245 testes no total, incluindo property-based tests com FsCheck.
+272 testes no total, incluindo property-based tests com FsCheck.
 
 ### Frontend (Vitest)
 
@@ -192,7 +220,9 @@ frogbets/
 │       └── Integration/       # Testes de integração com WebApplicationFactory
 ├── infra/                     # Scripts de infraestrutura AWS
 ├── docs/
-│   └── TECHNICAL.md           # Documentação técnica detalhada
+│   ├── TECHNICAL.md           # Documentação técnica detalhada
+│   ├── C4.md                  # Modelo C4 de arquitetura (Context, Containers, Components, Code)
+│   └── ADR.md                 # Architecture Decision Records
 ├── docker-compose.yml
 ├── Dockerfile.api
 ├── Dockerfile.frontend

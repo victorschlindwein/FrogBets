@@ -132,21 +132,106 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Deploy API to ECS
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-        with:
-          task-definition: infra/ecs-task-api.json
-          service: frogbets-api
-          cluster: frogbets
-          wait-for-service-stability: true
-          image: ${{ needs.build-and-push.outputs.api-image }}
-          container-name: frogbets-api
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          EXECUTION_ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/frogbets-ecs-execution-role"
+          ECR_REGISTRY="$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+
+          cat > /tmp/ecs-task-api.json << EOF
+          {
+            "family": "frogbets-api",
+            "networkMode": "awsvpc",
+            "requiresCompatibilities": ["FARGATE"],
+            "cpu": "512", "memory": "1024",
+            "executionRoleArn": "$EXECUTION_ROLE_ARN",
+            "containerDefinitions": [{
+              "name": "frogbets-api",
+              "image": "${{ needs.build-and-push.outputs.api-image }}",
+              "portMappings": [{"containerPort": 8080, "protocol": "tcp"}],
+              "environment": [
+                {"name": "ASPNETCORE_ENVIRONMENT", "value": "Production"},
+                {"name": "Jwt__Issuer", "value": "FrogBets"},
+                {"name": "Jwt__Audience", "value": "FrogBets"},
+                {"name": "Jwt__ExpirationMinutes", "value": "60"}
+              ],
+              "secrets": [
+                {"name": "ConnectionStrings__DefaultConnection", "valueFrom": "arn:aws:ssm:$AWS_REGION:$ACCOUNT_ID:parameter/frogbets/db-connection-string"},
+                {"name": "Jwt__Key", "valueFrom": "arn:aws:ssm:$AWS_REGION:$ACCOUNT_ID:parameter/frogbets/jwt-key"}
+              ],
+              "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                  "awslogs-group": "/ecs/frogbets-api",
+                  "awslogs-region": "$AWS_REGION",
+                  "awslogs-stream-prefix": "ecs",
+                  "awslogs-create-group": "true"
+                }
+              },
+              "essential": true
+            }]
+          }
+          EOF
+
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file:///tmp/ecs-task-api.json \
+            --region $AWS_REGION \
+            --query "taskDefinition.taskDefinitionArn" --output text)
+
+          aws ecs update-service \
+            --cluster frogbets \
+            --service frogbets-api \
+            --task-definition "$TASK_DEF_ARN" \
+            --force-new-deployment \
+            --region $AWS_REGION > /dev/null
+
+          aws ecs wait services-stable \
+            --cluster frogbets \
+            --services frogbets-api \
+            --region $AWS_REGION
 
       - name: Deploy Frontend to ECS
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-        with:
-          task-definition: infra/ecs-task-frontend.json
-          service: frogbets-frontend
-          cluster: frogbets
-          wait-for-service-stability: true
-          image: ${{ needs.build-and-push.outputs.frontend-image }}
-          container-name: frogbets-frontend
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          EXECUTION_ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/frogbets-ecs-execution-role"
+
+          cat > /tmp/ecs-task-frontend.json << EOF
+          {
+            "family": "frogbets-frontend",
+            "networkMode": "awsvpc",
+            "requiresCompatibilities": ["FARGATE"],
+            "cpu": "256", "memory": "512",
+            "executionRoleArn": "$EXECUTION_ROLE_ARN",
+            "containerDefinitions": [{
+              "name": "frogbets-frontend",
+              "image": "${{ needs.build-and-push.outputs.frontend-image }}",
+              "portMappings": [{"containerPort": 80, "protocol": "tcp"}],
+              "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                  "awslogs-group": "/ecs/frogbets-frontend",
+                  "awslogs-region": "$AWS_REGION",
+                  "awslogs-stream-prefix": "ecs",
+                  "awslogs-create-group": "true"
+                }
+              },
+              "essential": true
+            }]
+          }
+          EOF
+
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file:///tmp/ecs-task-frontend.json \
+            --region $AWS_REGION \
+            --query "taskDefinition.taskDefinitionArn" --output text)
+
+          aws ecs update-service \
+            --cluster frogbets \
+            --service frogbets-frontend \
+            --task-definition "$TASK_DEF_ARN" \
+            --force-new-deployment \
+            --region $AWS_REGION > /dev/null
+
+          aws ecs wait services-stable \
+            --cluster frogbets \
+            --services frogbets-frontend \
+            --region $AWS_REGION

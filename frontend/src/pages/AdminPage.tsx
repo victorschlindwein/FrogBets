@@ -23,9 +23,8 @@ function marketLabel(m: Market) {
 }
 
 // ── Índice de navegação ───────────────────────────────────────────────────
-const NAV_ITEMS_MASTER = [
+const NAV_ITEMS_BASE = [
   { id: 'sec-users',       label: '👥 Usuários' },
-  { id: 'sec-admins',      label: '🔐 Admins' },
   { id: 'sec-games',       label: '🎮 Cadastrar Jogo' },
   { id: 'sec-start',       label: '▶️ Iniciar Jogo' },
   { id: 'sec-result',      label: '🏁 Registrar Resultado' },
@@ -37,20 +36,12 @@ const NAV_ITEMS_MASTER = [
   { id: 'sec-swap',        label: '🔄 Troca Direta' },
 ]
 
-const NAV_ITEMS_PROMOTED = [
-  { id: 'sec-games',       label: '🎮 Cadastrar Jogo' },
-  { id: 'sec-start',       label: '▶️ Iniciar Jogo' },
-  { id: 'sec-result',      label: '🏁 Registrar Resultado' },
-  { id: 'sec-invites',     label: '🎟️ Convites' },
-  { id: 'sec-teams',       label: '🛡️ Times' },
-  { id: 'sec-players',     label: '👤 Jogadores' },
-  { id: 'sec-stats',       label: '📊 Estatísticas' },
-  { id: 'sec-leaders',     label: '👑 Gestão de Líderes' },
-  { id: 'sec-swap',        label: '🔄 Troca Direta' },
-]
+const NAV_ITEM_ADMINS = { id: 'sec-admins', label: '🔐 Admins' }
 
 function AdminNav({ isMasterAdmin }: { isMasterAdmin: boolean }) {
-  const items = isMasterAdmin ? NAV_ITEMS_MASTER : NAV_ITEMS_PROMOTED
+  const items = isMasterAdmin
+    ? [NAV_ITEMS_BASE[0], NAV_ITEM_ADMINS, ...NAV_ITEMS_BASE.slice(1)]
+    : NAV_ITEMS_BASE
   return (
     <nav className="admin-index card">
       <strong>Índice</strong>
@@ -1003,7 +994,7 @@ export default function AdminPage() {
     apiClient.get<User>('/users/me')
       .then(res => {
         if (!res.data.isAdmin) { setAccessDenied(true) }
-        else { setUser(res.data); loadGames(); if (res.data.isMasterAdmin) loadUsers() }
+        else { setUser(res.data); loadGames(); loadUsers() }
       })
       .catch(() => setAccessDenied(true))
       .finally(() => setLoading(false))
@@ -1018,7 +1009,7 @@ export default function AdminPage() {
     <div className="page page-admin">
       <h1>⚙️ Administração</h1>
       <AdminNav isMasterAdmin={isMasterAdmin} />
-      {isMasterAdmin && <UsersSection currentUser={user} />}
+      <UsersSection currentUser={user} />
       {isMasterAdmin && <AdminManagementSection users={users} currentUser={user} onUsersChange={loadUsers} />}
       <CreateGameForm teams={teams} onCreated={loadGames} />
       <StartGameSection games={games} onStarted={loadGames} />

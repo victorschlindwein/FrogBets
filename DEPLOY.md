@@ -238,6 +238,8 @@ INSERT INTO "Users" (
 | `/frogbets/api-url` | String | URL pública da API (usada no build do frontend) |
 | `/frogbets/allowed-origins` | String | Origem permitida no CORS da API |
 
+> **MasterAdminUsername** é definido diretamente na task definition do ECS (valor: `admin`). É o único usuário que pode promover/revogar outros admins pelo painel.
+
 ---
 
 ## Fluxo de Deploy Contínuo

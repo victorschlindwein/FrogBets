@@ -30,6 +30,7 @@ services:
       Jwt__Audience: FrogBets
       Jwt__ExpirationMinutes: 60
       AllowedOrigins: ${ALLOWED_ORIGINS}
+      MasterAdminUsername: ${MASTER_ADMIN_USERNAME}
     ports:
       - "8080:8080"
 

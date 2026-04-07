@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import apiClient from '../api/client'
+import CoinIcon from '../components/CoinIcon'
 
 interface Balance {
   virtualBalance: number
@@ -25,7 +26,7 @@ export default function DashboardPage() {
         <div className="stats-grid">
           <div className="stat-card">
             <div className="stat-label">Saldo Disponível</div>
-            <div className="stat-value">🪙 {balance.virtualBalance}</div>
+            <div className="stat-value"><CoinIcon size={20} /> {balance.virtualBalance}</div>
           </div>
           <div className="stat-card" style={{ borderLeftColor: 'var(--green)' }}>
             <div className="stat-label">Saldo Reservado</div>

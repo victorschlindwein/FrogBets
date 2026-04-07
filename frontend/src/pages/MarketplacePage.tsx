@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import apiClient from '../api/client'
+import CoinIcon from '../components/CoinIcon'
 
 interface Market {
   type: string
@@ -81,7 +82,7 @@ function BetRow({ bet, onCovered }: { bet: MarketplaceBet; onCovered: (id: strin
       <div className="bet-info">
         <span><strong>Mercado:</strong> {marketLabel(bet.market)}</span>
         <span><strong>Opção:</strong> {bet.creatorOption}</span>
-        <span><strong>Valor:</strong> 🪙 {bet.amount}</span>
+        <span><strong>Valor:</strong> <CoinIcon /> {bet.amount}</span>
       </div>
       <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
         {confirming ? (

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import apiClient from '../api/client'
+import CoinIcon from '../components/CoinIcon'
 
 interface LeaderboardEntry {
   username: string
@@ -45,7 +46,7 @@ export default function LeaderboardPage() {
                 <tr key={entry.username}>
                   <td><strong>{index + 1}</strong></td>
                   <td>{index === 0 ? '🥇 ' : index === 1 ? '🥈 ' : index === 2 ? '🥉 ' : ''}<span>{entry.username}</span></td>
-                  <td>🪙 <span>{entry.virtualBalance}</span></td>
+                  <td><CoinIcon /> <span>{entry.virtualBalance}</span></td>
                   <td style={{ color: 'var(--green)' }}>{entry.winsCount}</td>
                   <td style={{ color: 'var(--danger)' }}>{entry.lossesCount}</td>
                 </tr>

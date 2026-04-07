@@ -206,7 +206,7 @@ jobs:
             "containerDefinitions": [{
               "name": "frogbets-frontend",
               "image": "${{ needs.build-and-push.outputs.frontend-image }}",
-              "portMappings": [{"containerPort": 80, "protocol": "tcp"}],
+              "portMappings": [{"containerPort": 8080, "protocol": "tcp"}],
               "logConfiguration": {
                 "logDriver": "awslogs",
                 "options": {

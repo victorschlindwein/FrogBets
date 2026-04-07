@@ -21,6 +21,7 @@ public class FrogBetsDbContext : DbContext
     public DbSet<TradeListing> TradeListings => Set<TradeListing>();
     public DbSet<TradeOffer> TradeOffers => Set<TradeOffer>();
     public DbSet<RevokedToken> RevokedTokens => Set<RevokedToken>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -256,6 +257,30 @@ public class FrogBetsDbContext : DbContext
             e.HasKey(r => r.Jti);
             e.Property(r => r.Jti).HasMaxLength(128);
             e.HasIndex(r => r.ExpiresAt); // para limpeza periódica
+        });
+
+        // AuditLog
+        modelBuilder.Entity<AuditLog>(e =>
+        {
+            e.HasKey(a => a.Id);
+            e.Property(a => a.ActorUsername).IsRequired().HasMaxLength(100);
+            e.Property(a => a.Action).IsRequired().HasMaxLength(100);
+            e.Property(a => a.ResourceType).HasMaxLength(50);
+            e.Property(a => a.ResourceId).HasMaxLength(100);
+            e.Property(a => a.HttpMethod).IsRequired().HasMaxLength(10);
+            e.Property(a => a.Route).IsRequired().HasMaxLength(200);
+            e.Property(a => a.IpAddress).HasMaxLength(45);
+            e.Property(a => a.Details).HasMaxLength(1000);
+            e.Property(a => a.OccurredAt).IsRequired();
+
+            e.HasIndex(a => a.ActorId);
+            e.HasIndex(a => a.Action);
+            e.HasIndex(a => a.OccurredAt);
+
+            e.HasOne(a => a.Actor)
+                .WithMany()
+                .HasForeignKey(a => a.ActorId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }

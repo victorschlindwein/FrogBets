@@ -1,5 +1,6 @@
 using System.Text;
 using System.Threading.RateLimiting;
+using FrogBets.Api.Middleware;
 using FrogBets.Api.Services;
 using FrogBets.Infrastructure.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -92,6 +93,10 @@ builder.Services.AddScoped<ITeamMembershipService, TeamMembershipService>();
 // Trade service
 builder.Services.AddScoped<ITradeService, TradeService>();
 
+// Audit log service
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+builder.Services.AddHostedService<AuditLogCleanupService>();
+
 // JWT Bearer authentication
 var jwtSection = builder.Configuration.GetSection("Jwt");
 var key = Encoding.UTF8.GetBytes(jwtSection["Key"]!);
@@ -143,6 +148,7 @@ app.UseCors("Frontend");
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<AuditMiddleware>();
 app.MapControllers();
 app.MapGet("/api/health", () => Results.Ok(new { status = "healthy" }))
    .AllowAnonymous();

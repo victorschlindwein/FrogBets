@@ -104,6 +104,22 @@ Ao criar um jogo com N mapas, o sistema gera automaticamente N × 4 mercados de 
 **Opções para mercados de time:** `"TeamA"` ou `"TeamB"`
 **Opções para mercados de jogador:** `"<nickname>"` ou `"NOT_<nickname>"`
 
+### AuditLog
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `Id` | Guid | PK |
+| `ActorId` | Guid? | FK para User (nullable — null para requisições anônimas) |
+| `ActorUsername` | string | Username do actor (máx 100; "anonymous" para anônimos) |
+| `Action` | string | Identificador semântico da ação (ex: `bets.create`, `games.start`) |
+| `ResourceType` | string? | Tipo do recurso afetado (ex: `bet`, `game`, `user`) |
+| `ResourceId` | string? | ID do recurso afetado (extraído dos route values) |
+| `HttpMethod` | string | Método HTTP (POST, PATCH, PUT, DELETE) |
+| `Route` | string | Template da rota (ex: `api/bets/{id}/cover`) |
+| `StatusCode` | int | HTTP status code da resposta |
+| `IpAddress` | string? | Endereço IP do cliente (suporta IPv6, máx 45 chars) |
+| `OccurredAt` | DateTime | Timestamp UTC da ação |
+| `Details` | string? | Informações adicionais (máx 1000 chars, truncado automaticamente) |
+
 ### CS2Player / CS2Team / MatchStats
 
 Entidades para o sistema de rating de jogadores. O `PlayerScore` é acumulado usando a fórmula HLTV Rating 2.0 adaptada:
@@ -177,6 +193,13 @@ Onde: KPR = kills/rounds, DPR = deaths/rounds, ADR = damage/rounds, Impact = KPR
 | GET | `/api/players/ranking` | Público | Ranking de jogadores |
 | POST | `/api/players/{id}/stats` | Admin | Registrar estatísticas de partida |
 
+### Logs de Auditoria
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| GET | `/api/audit-logs` | Admin | Consultar logs de auditoria com filtros opcionais |
+
+**Query params:** `actorId` (Guid?), `action` (string?), `from` (DateTime?), `to` (DateTime?), `page` (int, padrão 1), `pageSize` (int, padrão 20, máx 100)
+
 ### Marketplace de Trocas
 | Método | Rota | Auth | Descrição |
 |---|---|---|---|
@@ -217,6 +240,9 @@ Onde: KPR = kills/rounds, DPR = deaths/rounds, ADR = damage/rounds, Impact = KPR
 | `MatchStatsService` | Registrar estatísticas de partida, calcular e acumular rating |
 | `RatingCalculator` | Cálculo estático do HLTV Rating 2.0 adaptado |
 | `TokenBlocklist` | Cache em memória + persistência no banco de JTIs revogados |
+| `AuditLogService` | Persistir, consultar e limpar logs de auditoria |
+| `AuditLogCleanupService` | IHostedService: limpeza diária de logs expirados |
+| `AuditMiddleware` | Middleware ASP.NET Core: intercepta escritas e persiste logs automaticamente |
 
 ---
 
@@ -247,6 +273,7 @@ O projeto usa **Entity Framework Core 8** com PostgreSQL 16. As migrações são
 | `AddPlayerRatingSystem` | Tabelas CS2Teams, CS2Players, MatchStats |
 | `AddTeamMembership` | Campos TeamId/IsTeamLeader em Users, tabelas TradeListings e TradeOffers |
 | `AddRevokedTokens` | Tabela RevokedTokens para blocklist de JWT |
+| `AddAuditLogs` | Tabela AuditLogs com índices em ActorId, Action, OccurredAt |
 
 ### Criar nova migração
 ```bash
@@ -264,6 +291,7 @@ dotnet ef migrations add NomeDaMigracao --startup-project ../FrogBets.Api
 | `JWT_KEY` | Chave secreta JWT (mín. 32 chars) — gere com `openssl rand -base64 32` |
 | `ALLOWED_ORIGINS` | Origens CORS permitidas (ex: `https://frogbets.example.com`) |
 | `MasterAdminUsername` | Username do admin master — protegido contra revogação de direitos via API |
+| `AUDIT_LOG_RETENTION_DAYS` | Dias de retenção dos logs de auditoria (padrão: 90) |
 
 Em produção, os valores são armazenados no AWS SSM Parameter Store e injetados nas tasks ECS. Nunca commite o arquivo `.env`.
 
@@ -277,7 +305,7 @@ Em produção, os valores são armazenados no AWS SSM Parameter Store e injetado
 dotnet test --configuration Release --verbosity quiet
 ```
 
-245 testes no total. Zero falhas é obrigatório antes de qualquer commit.
+264 testes no total. Zero falhas é obrigatório antes de qualquer commit.
 
 #### Arquivos de teste
 | Arquivo | Cobertura |
@@ -303,6 +331,8 @@ dotnet test --configuration Release --verbosity quiet
 | `Integration/TeamsIntegrationTests.cs` | Testes de integração de times |
 | `Integration/LeaderboardIntegrationTests.cs` | Testes de integração do leaderboard |
 | `Integration/MarketplaceIntegrationTests.cs` | Testes de integração do marketplace |
+| `AuditLogServiceTests.cs` | Testes unitários do AuditLogService |
+| `AuditLogPropertyTests.cs` | Properties 1-10 da spec audit-logs (FsCheck) |
 
 #### Configuração dos testes de integração
 

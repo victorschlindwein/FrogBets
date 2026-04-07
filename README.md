@@ -136,10 +136,12 @@ cd frontend
 npm test
 ```
 
-**Backend:**
+**Backend (todos os testes, incluindo property-based):**
 ```bash
 dotnet test
 ```
+
+A suíte de testes do backend usa **xUnit** para testes de exemplo e **FsCheck** para property-based testing. As propriedades de corretude de cada spec são verificadas com no mínimo 100 iterações aleatórias.
 
 ---
 
@@ -149,13 +151,22 @@ dotnet test
 frogbets/
 ├── src/
 │   ├── FrogBets.Api/          # Controllers, Services, configuração ASP.NET
+│   │   ├── Controllers/       # AuthController, BetsController, GamesController, ...
+│   │   └── Services/          # AuthService, BetService, SettlementService, ...
 │   ├── FrogBets.Domain/       # Entidades e enums de domínio
+│   │   ├── Entities/          # User, Game, Market, Bet, CS2Player, CS2Team, ...
+│   │   └── Enums/             # BetStatus, GameStatus, MarketType, ...
 │   └── FrogBets.Infrastructure/ # DbContext, migrações EF Core
+│       ├── Data/              # FrogBetsDbContext
+│       └── Migrations/        # Migrações EF Core
 ├── frontend/
 │   └── src/
-│       ├── api/               # Cliente HTTP (Axios)
-│       ├── components/        # Componentes reutilizáveis
-│       └── pages/             # Páginas da aplicação
+│       ├── api/               # Cliente HTTP (Axios) + endpoints de players
+│       ├── components/        # Navbar, ProtectedRoute
+│       └── pages/             # Login, Register, Dashboard, Games, Bets, ...
+├── tests/
+│   └── FrogBets.Tests/        # Testes unitários e property-based (xUnit + FsCheck)
+├── infra/                     # Scripts de infraestrutura AWS
 ├── docker-compose.yml
 ├── Dockerfile.api
 ├── Dockerfile.frontend

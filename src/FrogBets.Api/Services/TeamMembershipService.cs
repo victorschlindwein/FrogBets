@@ -84,6 +84,12 @@ public class TeamMembershipService : ITeamMembershipService
         }
 
         targetUser.TeamId = destinationTeamId;
+
+        // Remover trade listing automaticamente ao mudar de time (Requisito 4.6)
+        var listing = await _db.TradeListings.FirstOrDefaultAsync(tl => tl.UserId == targetUserId);
+        if (listing is not null)
+            _db.TradeListings.Remove(listing);
+
         await _db.SaveChangesAsync();
     }
 }

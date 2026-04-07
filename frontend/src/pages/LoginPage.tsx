@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import apiClient, { setToken } from '../api/client'
+import { publicClient, setToken } from '../api/client'
 
 export default function LoginPage() {
   const [username, setUsername] = useState('')
@@ -12,7 +12,7 @@ export default function LoginPage() {
     e.preventDefault()
     setError(null)
     try {
-      const res = await apiClient.post<{ token: string }>('/auth/login', { username, password })
+      const res = await publicClient.post<{ token: string }>('/auth/login', { username, password })
       setToken(res.data.token)
       navigate('/')
     } catch {

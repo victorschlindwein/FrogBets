@@ -18,6 +18,14 @@ Backend (ASP.NET Core 8 Web API) — Porta 8080
 PostgreSQL 16
 ```
 
+Em produção, o tráfego passa por um Application Load Balancer (AWS ALB):
+
+```
+Internet → ALB (porta 80)
+              ├── /api/* → ECS frogbets-api (porta 8080)
+              └── /*     → ECS frogbets-frontend (porta 8080, nginx-unprivileged)
+```
+
 ### Fluxo de autenticação
 
 1. `POST /api/auth/login` → retorna JWT com claims: `sub`, `unique_name`, `jti`, `isAdmin`
@@ -120,7 +128,7 @@ Onde: KPR = kills/rounds, DPR = deaths/rounds, ADR = damage/rounds, Impact = KPR
 ### Usuários
 | Método | Rota | Auth | Descrição |
 |---|---|---|---|
-| GET | `/api/users/me` | JWT | Perfil do usuário autenticado |
+| GET | `/api/users/me` | JWT | Perfil do usuário autenticado (inclui `isTeamLeader` e `teamId`) |
 | GET | `/api/users/me/balance` | JWT | Saldo virtual e reservado |
 | PATCH | `/api/users/{id}/team` | JWT (líder/admin) | Mover usuário de time |
 
@@ -128,6 +136,7 @@ Onde: KPR = kills/rounds, DPR = deaths/rounds, ADR = damage/rounds, Impact = KPR
 | Método | Rota | Auth | Descrição |
 |---|---|---|---|
 | GET | `/api/games` | Público | Listar todos os jogos |
+| GET | `/api/games/{id}` | Público | Detalhes de um jogo específico |
 | POST | `/api/games` | Admin | Criar jogo (gera mercados automaticamente) |
 | PATCH | `/api/games/{id}/start` | Admin | Iniciar jogo (fecha mercados) |
 | POST | `/api/games/{id}/results` | Admin | Registrar resultado de mercado |
@@ -197,8 +206,8 @@ Onde: KPR = kills/rounds, DPR = deaths/rounds, ADR = damage/rounds, Impact = KPR
 | `BalanceService` | Reserva, liberação e crédito de saldo virtual (transações Serializable) |
 | `BetService` | Criar, cobrir, cancelar apostas; listagem de apostas e marketplace |
 | `SettlementService` | Liquidar apostas ao registrar resultado de mercado |
-| `GameService` | Criar jogos, iniciar, registrar resultados |
-| `InviteService` | Gerar, validar, revogar tokens de convite |
+| `GameService` | Criar jogos, iniciar, registrar resultados, buscar por ID |
+| `InviteService` | Gerar, validar, revogar tokens de convite (RandomNumberGenerator) |
 | `TeamMembershipService` | Vincular usuários a times, gerenciar líderes |
 | `TradeService` | Marketplace de trocas: listings, ofertas, aceitação, troca direta |
 | `PlayerService` | CRUD de jogadores CS2, ranking |
@@ -213,9 +222,10 @@ Onde: KPR = kills/rounds, DPR = deaths/rounds, ADR = damage/rounds, Impact = KPR
 - **Autenticação:** JWT Bearer com expiração configurável (padrão 60 min)
 - **Autorização de admin:** verificada via claim `isAdmin` no JWT
 - **Autorização de líder:** verificada consultando o banco (não via claim, para evitar tokens desatualizados)
-- **Rate limiting:** 5 tentativas por 15 minutos nos endpoints de auth
+- **Rate limiting:** 5 tentativas por 15 minutos nos endpoints de auth (desabilitado no ambiente `Testing`)
 - **Logout:** token adicionado à blocklist (JTI persistido no banco, cache em memória)
-- **Senhas:** BCrypt com salt automático
+- **Senhas:** BCrypt com salt automático (BCrypt.Net-Next)
+- **Tokens de convite:** gerados com `RandomNumberGenerator.GetBytes(16)` — criptograficamente seguros
 - **CORS:** apenas a origem configurada em `ALLOWED_ORIGINS`
 - **Body limit:** 1 MB máximo por request
 - **Registro:** apenas via token de convite válido
@@ -224,7 +234,7 @@ Onde: KPR = kills/rounds, DPR = deaths/rounds, ADR = damage/rounds, Impact = KPR
 
 ## Banco de Dados
 
-O projeto usa **Entity Framework Core 8** com PostgreSQL 16. As migrações são aplicadas automaticamente no startup da API.
+O projeto usa **Entity Framework Core 8** com PostgreSQL 16. As migrações são aplicadas automaticamente no startup da API via `db.Database.Migrate()` (apenas quando o provider for relacional — ignorado em testes com InMemory).
 
 ### Migrações existentes
 | Migração | Descrição |
@@ -251,19 +261,21 @@ dotnet ef migrations add NomeDaMigracao --startup-project ../FrogBets.Api
 | `JWT_KEY` | Chave secreta JWT (mín. 32 chars) — gere com `openssl rand -base64 32` |
 | `ALLOWED_ORIGINS` | Origens CORS permitidas (ex: `https://frogbets.example.com`) |
 
-Em produção, configure essas variáveis diretamente no servidor ou CI/CD. Nunca commite o arquivo `.env`.
+Em produção, os valores são armazenados no AWS SSM Parameter Store e injetados nas tasks ECS. Nunca commite o arquivo `.env`.
 
 ---
 
 ## Testes
 
-A suíte de testes usa **xUnit** + **FsCheck** (property-based testing).
+### Backend — xUnit + FsCheck
 
 ```bash
-dotnet test
+dotnet test --configuration Release --verbosity quiet
 ```
 
-### Arquivos de teste
+245 testes no total. Zero falhas é obrigatório antes de qualquer commit.
+
+#### Arquivos de teste
 | Arquivo | Cobertura |
 |---|---|
 | `AuthServiceTests.cs` | Login, logout, blocklist |
@@ -278,9 +290,139 @@ dotnet test
 | `FrogBetsPropertyTests.cs` | Properties 1-19 da spec frog-bets (FsCheck) |
 | `PlayerRatingSystemTests.cs` | Properties da spec player-rating-system (FsCheck) |
 | `TeamMembershipTests.cs` | Properties da spec team-membership (FsCheck) |
+| `Integration/AuthIntegrationTests.cs` | Testes de integração de autenticação |
+| `Integration/GamesIntegrationTests.cs` | Testes de integração de jogos |
+| `Integration/UsersIntegrationTests.cs` | Testes de integração de usuários |
+| `Integration/PlayersIntegrationTests.cs` | Testes de integração de jogadores |
+| `Integration/BetsIntegrationTests.cs` | Testes de integração de apostas |
+| `Integration/InvitesIntegrationTests.cs` | Testes de integração de convites |
+| `Integration/TeamsIntegrationTests.cs` | Testes de integração de times |
+| `Integration/LeaderboardIntegrationTests.cs` | Testes de integração do leaderboard |
+| `Integration/MarketplaceIntegrationTests.cs` | Testes de integração do marketplace |
+
+#### Configuração dos testes de integração
+
+Os testes de integração usam `WebApplicationFactory<Program>` com banco InMemory. A `IntegrationTestFactory` configura:
+- Banco InMemory isolado por instância (Guid único)
+- Ambiente `Testing` — desabilita o rate limiter e usa `appsettings.Testing.json`
+- JWT com chave fixa de teste (`super-secret-key-that-is-at-least-32-chars!!`)
+
+O arquivo `src/FrogBets.Api/appsettings.Testing.json` contém a configuração JWT para os testes e é versionado no repositório (não contém secrets reais).
+
+### Frontend — Vitest
+
+```bash
+cd frontend
+npm run test -- --run
+```
+
+### Testes E2E com Cypress
+
+Os testes E2E validam fluxos completos da aplicação no browser, com frontend e API rodando localmente.
+
+#### Pré-requisitos
+
+- Frontend rodando em `http://localhost:5173` (Vite dev server)
+- API rodando em `http://localhost:8080`
+- Banco de dados com dados de teste disponíveis
+
+#### Iniciando o ambiente local
+
+**Terminal 1 — API:**
+```bash
+cd src/FrogBets.Api
+dotnet run
+```
+
+**Terminal 2 — Frontend:**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Aguarde ambos estarem prontos antes de abrir o Cypress.
+
+#### Rodando os testes
+
+**Modo interativo (recomendado para desenvolvimento):**
+```bash
+cd frontend
+npx cypress open
+```
+
+Isso abre a interface do Cypress onde você pode:
+- Selecionar o browser (Chrome, Firefox, Edge)
+- Ver os testes disponíveis em `cypress/e2e/`
+- Executar testes individualmente e ver o resultado em tempo real
+- Inspecionar cada passo com o time-travel debugger
+
+**Modo headless (CI / linha de comando):**
+```bash
+cd frontend
+npx cypress run
+```
+
+Executa todos os testes sem interface gráfica. Screenshots de falhas são salvas em `frontend/cypress/screenshots/`.
+
+**Rodar um arquivo específico:**
+```bash
+cd frontend
+npx cypress run --spec "cypress/e2e/auth.cy.ts"
+```
+
+**Rodar em um browser específico:**
+```bash
+cd frontend
+npx cypress run --browser chrome
+```
+
+#### Estrutura dos testes E2E
+
+```
+frontend/
+├── cypress/
+│   ├── e2e/           # Arquivos de teste (*.cy.ts)
+│   ├── fixtures/      # Dados de teste estáticos (JSON)
+│   └── support/
+│       └── e2e.ts     # Configuração global e comandos customizados
+└── cypress.config.ts  # Configuração: baseUrl, apiUrl, specPattern
+```
+
+#### Configuração (`cypress.config.ts`)
+
+```typescript
+{
+  e2e: {
+    baseUrl: 'http://localhost:5173',   // URL do frontend
+    specPattern: 'cypress/e2e/**/*.cy.ts',
+    env: {
+      apiUrl: 'http://localhost:8080',  // URL da API
+    }
+  }
+}
+```
+
+#### Dicas
+
+- Os testes E2E não fazem parte do pipeline de CI (apenas Vitest e xUnit rodam no GitHub Actions)
+- Use `cy.intercept()` para mockar chamadas de API quando necessário
+- Evite depender de dados persistidos entre testes — cada teste deve ser independente
+- Para testes que precisam de usuário autenticado, use `cy.session()` para reutilizar a sessão
 
 ---
 
 ## Deploy
 
 Veja [DEPLOY.md](../DEPLOY.md) para instruções de deploy em produção (AWS ECS Fargate).
+
+### Pipeline CI/CD
+
+Todo push para `main` dispara automaticamente via GitHub Actions:
+
+1. Roda testes .NET (`dotnet test`)
+2. Roda testes frontend (`npm run test`)
+3. Build das imagens Docker e push para ECR
+4. Deploy rolling update nos serviços ECS (sem downtime)
+
+A autenticação com a AWS usa OIDC (sem chaves estáticas no GitHub).

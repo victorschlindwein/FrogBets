@@ -41,9 +41,12 @@ O FrogBets resolve tudo isso em uma aplicação web self-hosted, sem dinheiro re
 | Autenticação | JWT Bearer |
 | Frontend | React 18, TypeScript, Vite |
 | HTTP Client | Axios |
+| Testes Backend | xUnit + FsCheck (property-based testing) |
 | Testes Frontend | Vitest + Testing Library |
+| Testes E2E | Cypress |
 | Containerização | Docker + Docker Compose |
 | Proxy reverso | Nginx |
+| Deploy | AWS ECS Fargate + ALB |
 
 ---
 
@@ -124,24 +127,44 @@ INSERT INTO "Users" ("Id", "Username", "PasswordHash", "IsAdmin", "VirtualBalanc
 VALUES (gen_random_uuid(), 'admin', '<bcrypt_hash>', true, 10000, 0, 0, 0, now(), false);
 ```
 
+Para gerar o hash BCrypt da senha, use o utilitário incluso:
+```bash
+# Crie um projeto temporário ou use o dotnet-script
+# O hash deve ser gerado com BCrypt.Net-Next, work factor 11
+```
+
 Após isso, use o painel admin para gerar convites para os demais usuários.
 
 ---
 
 ## Testes
 
-**Frontend:**
+### Backend (xUnit + FsCheck)
+
+```bash
+dotnet test --configuration Release --verbosity quiet
+```
+
+245 testes no total, incluindo property-based tests com FsCheck.
+
+### Frontend (Vitest)
+
 ```bash
 cd frontend
-npm test
+npm run test -- --run
 ```
 
-**Backend (todos os testes, incluindo property-based):**
+### E2E com Cypress
+
+Veja a seção completa em [docs/TECHNICAL.md — Testes E2E com Cypress](docs/TECHNICAL.md#testes-e2e-com-cypress).
+
+Resumo rápido:
 ```bash
-dotnet test
+# Com a aplicação rodando localmente (frontend em :5173, API em :8080)
+cd frontend
+npx cypress open    # interface interativa
+npx cypress run     # headless (CI)
 ```
-
-A suíte de testes do backend usa **xUnit** para testes de exemplo e **FsCheck** para property-based testing. As propriedades de corretude de cada spec são verificadas com no mínimo 100 iterações aleatórias.
 
 ---
 
@@ -165,13 +188,29 @@ frogbets/
 │       ├── components/        # Navbar, ProtectedRoute
 │       └── pages/             # Login, Register, Dashboard, Games, Bets, ...
 ├── tests/
-│   └── FrogBets.Tests/        # Testes unitários e property-based (xUnit + FsCheck)
+│   └── FrogBets.Tests/        # Testes unitários, integração e property-based
+│       └── Integration/       # Testes de integração com WebApplicationFactory
 ├── infra/                     # Scripts de infraestrutura AWS
+├── docs/
+│   └── TECHNICAL.md           # Documentação técnica detalhada
 ├── docker-compose.yml
 ├── Dockerfile.api
 ├── Dockerfile.frontend
+├── DEPLOY.md                  # Guia de deploy AWS ECS Fargate
 └── nginx.conf
 ```
+
+---
+
+## Deploy
+
+A aplicação roda em produção na AWS ECS Fargate com Application Load Balancer. Todo push para `main` dispara o pipeline de CI/CD via GitHub Actions:
+
+1. Roda os testes (.NET + Vitest)
+2. Build e push das imagens Docker para ECR
+3. Deploy rolling update nos serviços ECS
+
+Veja [DEPLOY.md](DEPLOY.md) para instruções completas de setup da infraestrutura.
 
 ---
 
@@ -187,7 +226,12 @@ Contribuições são bem-vindas. Siga o fluxo abaixo:
    git checkout -b fix/meu-bugfix
    ```
 3. Faça suas alterações com commits descritivos
-4. Abra um Pull Request descrevendo o que foi feito e por quê
+4. **Rode os testes antes de commitar** — zero falhas é obrigatório:
+   ```bash
+   dotnet test --configuration Release --verbosity quiet
+   cd frontend && npm run test -- --run
+   ```
+5. Abra um Pull Request descrevendo o que foi feito e por quê
 
 ### Convenções
 
@@ -195,21 +239,6 @@ Contribuições são bem-vindas. Siga o fluxo abaixo:
 - Código C# segue as convenções padrão do .NET (PascalCase para membros públicos)
 - Código TypeScript/React segue o estilo existente (componentes funcionais, hooks)
 - Adicione testes para novas funcionalidades sempre que possível
-
----
-
-## Registrar uma Issue
-
-Encontrou um bug ou tem uma sugestão? Abra uma issue no GitHub:
-
-1. Acesse a aba **Issues** do repositório
-2. Clique em **New Issue**
-3. Para bugs, inclua:
-   - Descrição do comportamento esperado vs. o que aconteceu
-   - Passos para reproduzir
-   - Versão do sistema operacional e navegador
-   - Logs relevantes (console do browser ou logs da API)
-4. Para sugestões, descreva o problema que a feature resolveria
 
 ---
 

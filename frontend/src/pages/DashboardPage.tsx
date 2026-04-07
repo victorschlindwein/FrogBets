@@ -25,11 +25,11 @@ export default function DashboardPage() {
         <div className="stats-grid">
           <div className="stat-card">
             <div className="stat-label">Saldo Disponível</div>
-            <div className="stat-value">🪙 {balance.virtualBalance.toLocaleString('pt-BR')}</div>
+            <div className="stat-value">🪙 {balance.virtualBalance}</div>
           </div>
           <div className="stat-card" style={{ borderLeftColor: 'var(--green)' }}>
             <div className="stat-label">Saldo Reservado</div>
-            <div className="stat-value">🔒 {balance.reservedBalance.toLocaleString('pt-BR')}</div>
+            <div className="stat-value">🔒 {balance.reservedBalance}</div>
           </div>
         </div>
       )}

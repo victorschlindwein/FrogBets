@@ -44,13 +44,13 @@ describe('Marketplace', () => {
   it('exibe botão Cobrir para cada aposta', () => {
     cy.visit('/marketplace')
     cy.wait('@getMarketplace')
-    cy.get('button').contains('Cobrir').should('have.length', 2)
+    cy.get('button.btn-orange').should('have.length', 2)
   })
 
   it('exibe confirmação antes de cobrir', () => {
     cy.visit('/marketplace')
     cy.wait('@getMarketplace')
-    cy.get('button').contains('Cobrir').first().click()
+    cy.get('button.btn-orange').first().click()
     cy.contains('Confirmar').should('be.visible')
     cy.contains('Cancelar').should('be.visible')
   })
@@ -58,9 +58,9 @@ describe('Marketplace', () => {
   it('cancela cobertura ao clicar em Cancelar', () => {
     cy.visit('/marketplace')
     cy.wait('@getMarketplace')
-    cy.get('button').contains('Cobrir').first().click()
+    cy.get('button.btn-orange').first().click()
     cy.contains('Cancelar').click()
-    cy.get('button').contains('Cobrir').should('have.length', 2)
+    cy.get('button.btn-orange').should('have.length', 2)
   })
 
   it('cobre aposta com sucesso e remove da lista', () => {
@@ -68,10 +68,10 @@ describe('Marketplace', () => {
 
     cy.visit('/marketplace')
     cy.wait('@getMarketplace')
-    cy.get('button').contains('Cobrir').first().click()
+    cy.get('button.btn-orange').first().click()
     cy.contains('Confirmar').click()
     cy.wait('@cover')
-    cy.get('button').contains('Cobrir').should('have.length', 1)
+    cy.get('button.btn-orange').should('have.length', 1)
   })
 
   it('exibe erro ao cobrir quando API falha', () => {
@@ -79,7 +79,7 @@ describe('Marketplace', () => {
 
     cy.visit('/marketplace')
     cy.wait('@getMarketplace')
-    cy.get('button').contains('Cobrir').first().click()
+    cy.get('button.btn-orange').first().click()
     cy.contains('Confirmar').click()
     cy.get('[role="alert"]').should('be.visible')
   })

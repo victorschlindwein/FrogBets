@@ -70,9 +70,10 @@ jobs:
       - name: Get API URL for frontend build
         id: api-url
         run: |
-          # Tenta buscar a URL do serviço ECS via SSM Parameter Store
           URL=$(aws ssm get-parameter --name "/frogbets/api-url" --query "Parameter.Value" --output text 2>/dev/null || echo "")
+          ORIGINS=$(aws ssm get-parameter --name "/frogbets/allowed-origins" --query "Parameter.Value" --output text 2>/dev/null || echo "")
           echo "value=${URL}" >> $GITHUB_OUTPUT
+          echo "origins=${ORIGINS}" >> $GITHUB_OUTPUT
 
       # ── API ──────────────────────────────────────────────────────────────
       - name: Build & Push API image
@@ -152,12 +153,12 @@ jobs:
                 {"name": "ASPNETCORE_ENVIRONMENT", "value": "Production"},
                 {"name": "Jwt__Issuer", "value": "FrogBets"},
                 {"name": "Jwt__Audience", "value": "FrogBets"},
-                {"name": "Jwt__ExpirationMinutes", "value": "60"},
-                {"name": "AllowedOrigins", "value": "http://frogbets-alb-1873636362.sa-east-1.elb.amazonaws.com"}
+                {"name": "Jwt__ExpirationMinutes", "value": "60"}
               ],
               "secrets": [
                 {"name": "ConnectionStrings__DefaultConnection", "valueFrom": "arn:aws:ssm:$AWS_REGION:$ACCOUNT_ID:parameter/frogbets/db-connection-string"},
-                {"name": "Jwt__Key", "valueFrom": "arn:aws:ssm:$AWS_REGION:$ACCOUNT_ID:parameter/frogbets/jwt-key"}
+                {"name": "Jwt__Key", "valueFrom": "arn:aws:ssm:$AWS_REGION:$ACCOUNT_ID:parameter/frogbets/jwt-key"},
+                {"name": "AllowedOrigins", "valueFrom": "arn:aws:ssm:$AWS_REGION:$ACCOUNT_ID:parameter/frogbets/allowed-origins"}
               ],
               "logConfiguration": {
                 "logDriver": "awslogs",

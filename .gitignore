@@ -25,6 +25,7 @@ appsettings.*.json
 .env
 .env.*
 !.env.example
+infra/.tmp/
 
 # OS
 .DS_Store

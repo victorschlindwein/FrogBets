@@ -1,0 +1,198 @@
+name: Bootstrap AWS Infrastructure
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap:
+    name: Provision AWS Infrastructure
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: sa-east-1
+      APP_NAME: frogbets
+      DB_NAME: FrogBets
+      DB_USER: frogbetsadmin
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (temporary bootstrap keys)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.BOOTSTRAP_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.BOOTSTRAP_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # 1. ECR
+      - name: Create ECR repositories
+        run: |
+          for repo in frogbets-api frogbets-frontend; do
+            aws ecr describe-repositories --repository-names "$repo" --region $AWS_REGION > /dev/null 2>&1 || \
+            aws ecr create-repository \
+              --repository-name "$repo" \
+              --region $AWS_REGION \
+              --image-scanning-configuration scanOnPush=true > /dev/null
+          done
+          echo "ECR_REGISTRY=$(aws sts get-caller-identity --query Account --output text).dkr.ecr.$AWS_REGION.amazonaws.com" >> $GITHUB_ENV
+
+      # 2. VPC
+      - name: Get default VPC
+        run: |
+          VPC_ID=$(aws ec2 describe-vpcs \
+            --filters "Name=isDefault,Values=true" \
+            --query "Vpcs[0].VpcId" --output text --region $AWS_REGION)
+          echo "VPC_ID=$VPC_ID" >> $GITHUB_ENV
+
+      # 3. Security Groups
+      - name: Create Security Groups
+        run: |
+          ALB_SG=$(aws ec2 describe-security-groups \
+            --filters "Name=group-name,Values=${APP_NAME}-alb-sg" \
+            --query "SecurityGroups[0].GroupId" --output text --region $AWS_REGION 2>/dev/null || echo "")
+          if [ -z "$ALB_SG" ] || [ "$ALB_SG" = "None" ]; then
+            ALB_SG=$(aws ec2 create-security-group \
+              --group-name "${APP_NAME}-alb-sg" --description "FrogBets ALB" \
+              --vpc-id $VPC_ID --region $AWS_REGION --query GroupId --output text)
+            aws ec2 authorize-security-group-ingress --group-id $ALB_SG --protocol tcp --port 80 --cidr 0.0.0.0/0 --region $AWS_REGION > /dev/null
+            aws ec2 authorize-security-group-ingress --group-id $ALB_SG --protocol tcp --port 443 --cidr 0.0.0.0/0 --region $AWS_REGION > /dev/null
+          fi
+
+          ECS_SG=$(aws ec2 describe-security-groups \
+            --filters "Name=group-name,Values=${APP_NAME}-ecs-sg" \
+            --query "SecurityGroups[0].GroupId" --output text --region $AWS_REGION 2>/dev/null || echo "")
+          if [ -z "$ECS_SG" ] || [ "$ECS_SG" = "None" ]; then
+            ECS_SG=$(aws ec2 create-security-group \
+              --group-name "${APP_NAME}-ecs-sg" --description "FrogBets ECS Tasks" \
+              --vpc-id $VPC_ID --region $AWS_REGION --query GroupId --output text)
+            aws ec2 authorize-security-group-ingress --group-id $ECS_SG --protocol tcp --port 8080 --source-group $ALB_SG --region $AWS_REGION > /dev/null
+            aws ec2 authorize-security-group-ingress --group-id $ECS_SG --protocol tcp --port 80 --source-group $ALB_SG --region $AWS_REGION > /dev/null
+          fi
+
+          RDS_SG=$(aws ec2 describe-security-groups \
+            --filters "Name=group-name,Values=${APP_NAME}-rds-sg" \
+            --query "SecurityGroups[0].GroupId" --output text --region $AWS_REGION 2>/dev/null || echo "")
+          if [ -z "$RDS_SG" ] || [ "$RDS_SG" = "None" ]; then
+            RDS_SG=$(aws ec2 create-security-group \
+              --group-name "${APP_NAME}-rds-sg" --description "FrogBets RDS" \
+              --vpc-id $VPC_ID --region $AWS_REGION --query GroupId --output text)
+            aws ec2 authorize-security-group-ingress --group-id $RDS_SG --protocol tcp --port 5432 --source-group $ECS_SG --region $AWS_REGION > /dev/null
+          fi
+
+          echo "RDS_SG=$RDS_SG" >> $GITHUB_ENV
+
+      # 4. RDS
+      - name: Create RDS PostgreSQL
+        run: |
+          RDS_EXISTS=$(aws rds describe-db-instances \
+            --db-instance-identifier "${APP_NAME}-db" \
+            --query "DBInstances[0].DBInstanceIdentifier" --output text --region $AWS_REGION 2>/dev/null || echo "")
+
+          if [ -z "$RDS_EXISTS" ] || [ "$RDS_EXISTS" = "None" ]; then
+            aws rds create-db-instance \
+              --db-instance-identifier "${APP_NAME}-db" \
+              --db-instance-class db.t3.micro \
+              --engine postgres \
+              --engine-version "16" \
+              --master-username $DB_USER \
+              --master-user-password "${{ secrets.DB_PASSWORD }}" \
+              --db-name $DB_NAME \
+              --allocated-storage 20 \
+              --storage-type gp2 \
+              --vpc-security-group-ids $RDS_SG \
+              --no-publicly-accessible \
+              --backup-retention-period 0 \
+              --region $AWS_REGION > /dev/null
+            echo "RDS created, waiting..."
+          else
+            echo "RDS already exists, skipping..."
+          fi
+
+          aws rds wait db-instance-available \
+            --db-instance-identifier "${APP_NAME}-db" --region $AWS_REGION
+
+          DB_HOST=$(aws rds describe-db-instances \
+            --db-instance-identifier "${APP_NAME}-db" \
+            --query "DBInstances[0].Endpoint.Address" --output text --region $AWS_REGION)
+          echo "DB_HOST=$DB_HOST" >> $GITHUB_ENV
+
+      # 5. ECS Cluster
+      - name: Create ECS Cluster
+        run: |
+          aws ecs create-cluster \
+            --cluster-name $APP_NAME \
+            --capacity-providers FARGATE FARGATE_SPOT \
+            --region $AWS_REGION > /dev/null 2>/dev/null || true
+
+      # 6. IAM Role para ECS
+      - name: Create IAM execution role
+        run: |
+          TRUST='{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ecs-tasks.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
+          aws iam create-role \
+            --role-name "${APP_NAME}-ecs-execution-role" \
+            --assume-role-policy-document "$TRUST" > /dev/null 2>/dev/null || true
+          aws iam attach-role-policy \
+            --role-name "${APP_NAME}-ecs-execution-role" \
+            --policy-arn arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy 2>/dev/null || true
+
+      # 7. SSM Parameters
+      - name: Store secrets in SSM
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          DB_CONN="Host=${DB_HOST};Port=5432;Database=${DB_NAME};Username=${DB_USER};Password=${{ secrets.DB_PASSWORD }};SSL Mode=Require;Trust Server Certificate=true"
+          JWT_KEY=$(openssl rand -base64 48)
+
+          aws ssm put-parameter \
+            --name "/frogbets/db-connection-string" \
+            --value "$DB_CONN" \
+            --type SecureString --overwrite --region $AWS_REGION > /dev/null
+
+          aws ssm put-parameter \
+            --name "/frogbets/jwt-key" \
+            --value "$JWT_KEY" \
+            --type SecureString --overwrite --region $AWS_REGION > /dev/null
+
+      # 8. OIDC + Role para GitHub Actions
+      - name: Setup OIDC and GitHub Actions role
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+          OIDC_ARN=$(aws iam list-open-id-connect-providers \
+            --query "OpenIDConnectProviderList[?ends_with(Arn, 'token.actions.githubusercontent.com')].Arn" \
+            --output text 2>/dev/null)
+
+          if [ -z "$OIDC_ARN" ]; then
+            OIDC_ARN=$(aws iam create-open-id-connect-provider \
+              --url https://token.actions.githubusercontent.com \
+              --client-id-list sts.amazonaws.com \
+              --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1 \
+              --query OpenIDConnectProviderArn --output text)
+          fi
+
+          GITHUB_TRUST="{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Federated\":\"${OIDC_ARN}\"},\"Action\":\"sts:AssumeRoleWithWebIdentity\",\"Condition\":{\"StringEquals\":{\"token.actions.githubusercontent.com:aud\":\"sts.amazonaws.com\"},\"StringLike\":{\"token.actions.githubusercontent.com:sub\":\"repo:victorschlindwein/FrogBets:*\"}}}]}"
+
+          aws iam create-role \
+            --role-name "${APP_NAME}-github-actions" \
+            --assume-role-policy-document "$GITHUB_TRUST" > /dev/null 2>/dev/null || \
+          aws iam update-assume-role-policy \
+            --role-name "${APP_NAME}-github-actions" \
+            --policy-document "$GITHUB_TRUST" > /dev/null
+
+          EXECUTION_ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/${APP_NAME}-ecs-execution-role"
+          GITHUB_POLICY="{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"ecr:GetAuthorizationToken\"],\"Resource\":\"*\"},{\"Effect\":\"Allow\",\"Action\":[\"ecr:BatchCheckLayerAvailability\",\"ecr:GetDownloadUrlForLayer\",\"ecr:BatchGetImage\",\"ecr:PutImage\",\"ecr:InitiateLayerUpload\",\"ecr:UploadLayerPart\",\"ecr:CompleteLayerUpload\"],\"Resource\":\"arn:aws:ecr:${AWS_REGION}:${ACCOUNT_ID}:repository/frogbets-*\"},{\"Effect\":\"Allow\",\"Action\":[\"ecs:UpdateService\",\"ecs:DescribeServices\",\"ecs:RegisterTaskDefinition\",\"ecs:DescribeTaskDefinition\"],\"Resource\":\"*\"},{\"Effect\":\"Allow\",\"Action\":[\"iam:PassRole\"],\"Resource\":\"${EXECUTION_ROLE_ARN}\"},{\"Effect\":\"Allow\",\"Action\":[\"ssm:GetParameter\",\"ssm:GetParameters\"],\"Resource\":\"arn:aws:ssm:${AWS_REGION}:${ACCOUNT_ID}:parameter/frogbets/*\"}]}"
+
+          aws iam put-role-policy \
+            --role-name "${APP_NAME}-github-actions" \
+            --policy-name "${APP_NAME}-deploy-policy" \
+            --policy-document "$GITHUB_POLICY" > /dev/null
+
+          GITHUB_ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/${APP_NAME}-github-actions"
+          echo ""
+          echo "======================================================"
+          echo "BOOTSTRAP COMPLETE"
+          echo "Add this secret to GitHub (Settings > Secrets > Actions):"
+          echo "  AWS_ROLE_ARN = $GITHUB_ROLE_ARN"
+          echo "Then delete BOOTSTRAP_AWS_ACCESS_KEY_ID and BOOTSTRAP_AWS_SECRET_ACCESS_KEY"
+          echo "======================================================"

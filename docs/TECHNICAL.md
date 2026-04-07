@@ -120,6 +120,17 @@ Ao criar um jogo com N mapas, o sistema gera automaticamente N × 4 mercados de 
 | `OccurredAt` | DateTime | Timestamp UTC da ação |
 | `Details` | string? | Informações adicionais (máx 1000 chars, truncado automaticamente) |
 
+### MapResult
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `Id` | Guid | PK |
+| `GameId` | Guid | FK para Game |
+| `MapNumber` | int | Número ordinal do mapa na série (≥ 1) |
+| `Rounds` | int | Total de rounds jogados neste mapa (> 0) |
+| `CreatedAt` | DateTime | Timestamp UTC de criação |
+
+Constraint de unicidade: `(GameId, MapNumber)` — não é possível registrar o mesmo mapa duas vezes na mesma série.
+
 ### CS2Player / CS2Team / MatchStats
 
 Entidades para o sistema de rating de jogadores. O `PlayerScore` é acumulado usando a fórmula HLTV Rating 2.0 adaptada:
@@ -129,6 +140,21 @@ Rating = 0.0073 × KAST + 0.3591 × KPR + (−0.5329) × DPR + 0.2372 × Impact 
 ```
 
 Onde: KPR = kills/rounds, DPR = deaths/rounds, ADR = damage/rounds, Impact = KPR + (assists/rounds × 0.4)
+
+`MatchStats` referencia `MapResultId` (em vez de `GameId` + `Rounds`). O campo `Rounds` foi removido de `MatchStats` e passa a ser obtido do `MapResult` associado. A constraint de unicidade mudou de `(PlayerId, GameId)` para `(PlayerId, MapResultId)`.
+
+| Campo `MatchStats` | Tipo | Descrição |
+|---|---|---|
+| `Id` | Guid | PK |
+| `PlayerId` | Guid | FK para CS2Player |
+| `MapResultId` | Guid | FK para MapResult (substitui GameId; Rounds obtido via MapResult) |
+| `Kills` | int | Abates no mapa |
+| `Deaths` | int | Mortes no mapa |
+| `Assists` | int | Assistências no mapa |
+| `TotalDamage` | double | Dano total causado |
+| `KastPercent` | double | % de rounds com Kill/Assist/Survive/Trade (0–100) |
+| `Rating` | double | Rating calculado pela fórmula HLTV 2.0 adaptada |
+| `CreatedAt` | DateTime | Timestamp UTC de criação |
 
 ---
 
@@ -191,7 +217,14 @@ Onde: KPR = kills/rounds, DPR = deaths/rounds, ADR = damage/rounds, Impact = KPR
 | POST | `/api/players` | Admin | Criar jogador |
 | GET | `/api/players` | Admin | Listar jogadores |
 | GET | `/api/players/ranking` | Público | Ranking de jogadores |
-| POST | `/api/players/{id}/stats` | Admin | Registrar estatísticas de partida |
+| POST | `/api/players/{id}/stats` | Admin | Registrar estatísticas de partida (body: `mapResultId`, kills, deaths, assists, totalDamage, kastPercent) |
+| GET | `/api/players/{id}/stats` | Público | Retornar estatísticas de um jogador por mapa |
+
+### MapResults
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| POST | `/api/map-results` | Admin | Criar MapResult para um jogo (body: `gameId`, `mapNumber`, `rounds`) |
+| GET | `/api/map-results?gameId={id}` | Admin | Listar MapResults de um jogo, ordenados por MapNumber |
 
 ### Logs de Auditoria
 | Método | Rota | Auth | Descrição |
@@ -274,6 +307,7 @@ O projeto usa **Entity Framework Core 8** com PostgreSQL 16. As migrações são
 | `AddTeamMembership` | Campos TeamId/IsTeamLeader em Users, tabelas TradeListings e TradeOffers |
 | `AddRevokedTokens` | Tabela RevokedTokens para blocklist de JWT |
 | `AddAuditLogs` | Tabela AuditLogs com índices em ActorId, Action, OccurredAt |
+| `AddMapResultAndRefactorMatchStats` | Nova tabela MapResults; MatchStats perde `Rounds` e `GameId`, ganha `MapResultId`; constraint única muda de `(PlayerId, GameId)` para `(PlayerId, MapResultId)` |
 
 ### Criar nova migração
 ```bash

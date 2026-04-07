@@ -136,4 +136,20 @@ public static class SeedHelper
         await db.SaveChangesAsync();
         return player;
     }
+
+    public static async Task<MapResult> SeedMapResultAsync(
+        FrogBetsDbContext db, Guid gameId, int mapNumber = 1, int rounds = 30)
+    {
+        var mapResult = new MapResult
+        {
+            Id        = Guid.NewGuid(),
+            GameId    = gameId,
+            MapNumber = mapNumber,
+            Rounds    = rounds,
+            CreatedAt = DateTime.UtcNow,
+        };
+        db.MapResults.Add(mapResult);
+        await db.SaveChangesAsync();
+        return mapResult;
+    }
 }

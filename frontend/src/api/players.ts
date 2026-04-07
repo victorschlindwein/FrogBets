@@ -28,14 +28,36 @@ export interface PlayerRankingItem {
   matchesCount: number;
 }
 
-export interface RegisterStatsPayload {
+export interface MapResult {
+  id: string;
   gameId: string;
+  mapNumber: number;
+  rounds: number;
+  createdAt: string;
+}
+
+export interface RegisterStatsPayload {
+  mapResultId: string;
   kills: number;
   deaths: number;
   assists: number;
   totalDamage: number;
-  rounds: number;
   kastPercent: number;
+}
+
+export interface MatchStatsDto {
+  id: string;
+  playerId: string;
+  mapResultId: string;
+  mapNumber: number;
+  rounds: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  totalDamage: number;
+  kastPercent: number;
+  rating: number;
+  createdAt: string;
 }
 
 export const getTeams = (): Promise<CS2Team[]> =>
@@ -58,8 +80,21 @@ export const createPlayer = (data: {
 export const getPlayersRanking = (): Promise<PlayerRankingItem[]> =>
   apiClient.get<PlayerRankingItem[]>('/players/ranking').then((r) => r.data)
 
+export const createMapResult = (data: {
+  gameId: string;
+  mapNumber: number;
+  rounds: number;
+}): Promise<MapResult> =>
+  apiClient.post<MapResult>('/map-results', data).then((r) => r.data)
+
+export const getMapResultsByGame = (gameId: string): Promise<MapResult[]> =>
+  apiClient.get<MapResult[]>(`/map-results?gameId=${gameId}`).then((r) => r.data)
+
 export const registerMatchStats = (
   playerId: string,
   data: RegisterStatsPayload
 ): Promise<unknown> =>
   apiClient.post(`/players/${playerId}/stats`, data).then((r) => r.data)
+
+export const getPlayerStats = (playerId: string): Promise<MatchStatsDto[]> =>
+  publicClient.get<MatchStatsDto[]>(`/players/${playerId}/stats`).then((r) => r.data)

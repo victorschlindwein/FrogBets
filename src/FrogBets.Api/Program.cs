@@ -87,6 +87,9 @@ builder.Services.AddScoped<IPlayerService, PlayerService>();
 // Match stats service
 builder.Services.AddScoped<IMatchStatsService, MatchStatsService>();
 
+// Map result service
+builder.Services.AddScoped<IMapResultService, MapResultService>();
+
 // Team membership service
 builder.Services.AddScoped<ITeamMembershipService, TeamMembershipService>();
 

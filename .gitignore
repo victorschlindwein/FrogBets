@@ -27,6 +27,9 @@ appsettings.*.json
 !.env.example
 infra/.tmp/
 
+# Local docs (not for version control)
+docs/DNS-ROUTE53.md
+
 # Cypress artifacts
 frontend/cypress/screenshots/
 frontend/cypress/videos/

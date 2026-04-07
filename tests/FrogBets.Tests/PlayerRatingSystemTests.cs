@@ -72,6 +72,21 @@ public class PlayerRatingSystemTests
         return game;
     }
 
+    private static async Task<MapResult> SeedMapResultAsync(FrogBetsDbContext db, Guid gameId, int mapNumber = 1, int rounds = 20)
+    {
+        var mapResult = new MapResult
+        {
+            Id        = Guid.NewGuid(),
+            GameId    = gameId,
+            MapNumber = mapNumber,
+            Rounds    = rounds,
+            CreatedAt = DateTime.UtcNow,
+        };
+        db.MapResults.Add(mapResult);
+        await db.SaveChangesAsync();
+        return mapResult;
+    }
+
     // ── RatingCalculator unit tests ───────────────────────────────────────────
 
     // Feature: player-rating-system, Property 4.1: KPR = kills / rounds
@@ -163,12 +178,13 @@ public class PlayerRatingSystemTests
             double expectedScore = 0.0;
             for (int i = 0; i < matchCount; i++)
             {
-                var game = SeedGameAsync(db).GetAwaiter().GetResult();
-                int kills = 10 + i, deaths = 5, assists = 3, rounds = 20;
+                var game      = SeedGameAsync(db).GetAwaiter().GetResult();
+                var mapResult = SeedMapResultAsync(db, game.Id, mapNumber: i + 1, rounds: 20).GetAwaiter().GetResult();
+                int kills = 10 + i, deaths = 5, assists = 3;
                 double damage = 1500, kast = 70;
 
                 var dto = svc.RegisterStatsAsync(new RegisterStatsRequest(
-                    player.Id, game.Id, kills, deaths, assists, damage, rounds, kast))
+                    player.Id, mapResult.Id, kills, deaths, assists, damage, kast))
                     .GetAwaiter().GetResult();
 
                 expectedScore += dto.Rating;
@@ -180,52 +196,41 @@ public class PlayerRatingSystemTests
         });
     }
 
-    // Feature: player-rating-system, Property 3.5: duplicate stats for same player+game are rejected
+    // Feature: player-rating-system, Property 3.5: duplicate stats for same player+mapResult are rejected
     [Fact]
-    public async Task MatchStats_DuplicatePlayerGame_ThrowsStatsAlreadyRegistered()
+    public async Task MatchStats_DuplicatePlayerMapResult_ThrowsStatsAlreadyRegistered()
     {
         await using var db = CreateDb();
-        var team   = await SeedTeamAsync(db);
-        var player = await SeedPlayerAsync(db, team.Id);
-        var game   = await SeedGameAsync(db);
-        var svc    = new MatchStatsService(db);
+        var team      = await SeedTeamAsync(db);
+        var player    = await SeedPlayerAsync(db, team.Id);
+        var game      = await SeedGameAsync(db);
+        var mapResult = await SeedMapResultAsync(db, game.Id);
+        var svc       = new MatchStatsService(db);
 
         await svc.RegisterStatsAsync(new RegisterStatsRequest(
-            player.Id, game.Id, 10, 5, 3, 1500, 20, 70));
+            player.Id, mapResult.Id, 10, 5, 3, 1500, 70));
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             svc.RegisterStatsAsync(new RegisterStatsRequest(
-                player.Id, game.Id, 12, 4, 2, 1600, 20, 75)));
+                player.Id, mapResult.Id, 12, 4, 2, 1600, 75)));
 
         Assert.Equal("STATS_ALREADY_REGISTERED", ex.Message);
     }
 
-    // Feature: player-rating-system, Property 3.6: rounds <= 0 is rejected
-    [Property(MaxTest = 100)]
-    public Property MatchStats_InvalidRounds_IsRejected()
+    // Feature: player-rating-system, Property 3.6: mapResult not found is rejected
+    [Fact]
+    public async Task MatchStats_MapResultNotFound_ThrowsMapResultNotFound()
     {
-        var gen = Gen.Choose(-100, 0);
+        await using var db = CreateDb();
+        var team   = await SeedTeamAsync(db);
+        var player = await SeedPlayerAsync(db, team.Id);
+        var svc    = new MatchStatsService(db);
 
-        return Prop.ForAll(gen.ToArbitrary(), invalidRounds =>
-        {
-            using var db = CreateDb();
-            var team   = SeedTeamAsync(db).GetAwaiter().GetResult();
-            var player = SeedPlayerAsync(db, team.Id).GetAwaiter().GetResult();
-            var game   = SeedGameAsync(db).GetAwaiter().GetResult();
-            var svc    = new MatchStatsService(db);
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            svc.RegisterStatsAsync(new RegisterStatsRequest(
+                player.Id, Guid.NewGuid(), 10, 5, 3, 1500, 70)));
 
-            try
-            {
-                svc.RegisterStatsAsync(new RegisterStatsRequest(
-                    player.Id, game.Id, 10, 5, 3, 1500, invalidRounds, 70))
-                    .GetAwaiter().GetResult();
-                return false; // should have thrown
-            }
-            catch (InvalidOperationException ex)
-            {
-                return ex.Message == "INVALID_ROUNDS_COUNT";
-            }
-        });
+        Assert.Equal("MAP_RESULT_NOT_FOUND", ex.Message);
     }
 
     // Feature: player-rating-system, Property 3.7: KAST outside [0,100] is rejected
@@ -239,15 +244,16 @@ public class PlayerRatingSystemTests
         return Prop.ForAll(gen.ToArbitrary(), invalidKast =>
         {
             using var db = CreateDb();
-            var team   = SeedTeamAsync(db).GetAwaiter().GetResult();
-            var player = SeedPlayerAsync(db, team.Id).GetAwaiter().GetResult();
-            var game   = SeedGameAsync(db).GetAwaiter().GetResult();
-            var svc    = new MatchStatsService(db);
+            var team      = SeedTeamAsync(db).GetAwaiter().GetResult();
+            var player    = SeedPlayerAsync(db, team.Id).GetAwaiter().GetResult();
+            var game      = SeedGameAsync(db).GetAwaiter().GetResult();
+            var mapResult = SeedMapResultAsync(db, game.Id).GetAwaiter().GetResult();
+            var svc       = new MatchStatsService(db);
 
             try
             {
                 svc.RegisterStatsAsync(new RegisterStatsRequest(
-                    player.Id, game.Id, 10, 5, 3, 1500, 20, invalidKast))
+                    player.Id, mapResult.Id, 10, 5, 3, 1500, invalidKast))
                     .GetAwaiter().GetResult();
                 return false; // should have thrown
             }

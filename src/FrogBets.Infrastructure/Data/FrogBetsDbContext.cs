@@ -17,6 +17,7 @@ public class FrogBetsDbContext : DbContext
     public DbSet<Invite> Invites => Set<Invite>();
     public DbSet<CS2Team> CS2Teams => Set<CS2Team>();
     public DbSet<CS2Player> CS2Players => Set<CS2Player>();
+    public DbSet<MapResult> MapResults => Set<MapResult>();
     public DbSet<MatchStats> MatchStats => Set<MatchStats>();
     public DbSet<TradeListing> TradeListings => Set<TradeListing>();
     public DbSet<TradeOffer> TradeOffers => Set<TradeOffer>();
@@ -185,17 +186,28 @@ public class FrogBetsDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        // MapResult
+        modelBuilder.Entity<MapResult>(e =>
+        {
+            e.HasKey(m => m.Id);
+            e.HasIndex(m => new { m.GameId, m.MapNumber }).IsUnique();
+            e.Property(m => m.CreatedAt).IsRequired();
+            e.HasOne(m => m.Game)
+                .WithMany()
+                .HasForeignKey(m => m.GameId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(m => m.Stats)
+                .WithOne(s => s.MapResult)
+                .HasForeignKey(s => s.MapResultId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         // MatchStats
         modelBuilder.Entity<MatchStats>(e =>
         {
             e.HasKey(s => s.Id);
-            e.HasIndex(s => new { s.PlayerId, s.GameId }).IsUnique();
+            e.HasIndex(s => new { s.PlayerId, s.MapResultId }).IsUnique();
             e.Property(s => s.CreatedAt).IsRequired();
-
-            e.HasOne(s => s.Game)
-                .WithMany()
-                .HasForeignKey(s => s.GameId)
-                .OnDelete(DeleteBehavior.Restrict);
         });
 
         // User → CS2Team FK (TeamId nullable, SetNull on delete)

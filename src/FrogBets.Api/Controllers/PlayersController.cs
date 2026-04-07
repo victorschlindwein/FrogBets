@@ -80,19 +80,18 @@ public class PlayersController : ControllerBase
         {
             var stats = await _matchStatsService.RegisterStatsAsync(new RegisterStatsRequest(
                 PlayerId: id,
-                GameId: body.GameId,
+                MapResultId: body.MapResultId,
                 Kills: body.Kills,
                 Deaths: body.Deaths,
                 Assists: body.Assists,
                 TotalDamage: body.TotalDamage,
-                Rounds: body.Rounds,
                 KastPercent: body.KastPercent));
 
             return StatusCode(201, stats);
         }
-        catch (InvalidOperationException ex) when (ex.Message == "INVALID_ROUNDS_COUNT")
+        catch (InvalidOperationException ex) when (ex.Message == "MAP_RESULT_NOT_FOUND")
         {
-            return BadRequest(new { error = new { code = ex.Message, message = "Número de rounds inválido." } });
+            return NotFound(new { error = new { code = ex.Message, message = "MapResult não encontrado." } });
         }
         catch (InvalidOperationException ex) when (ex.Message == "INVALID_KAST_VALUE")
         {
@@ -104,8 +103,17 @@ public class PlayersController : ControllerBase
         }
         catch (InvalidOperationException ex) when (ex.Message == "STATS_ALREADY_REGISTERED")
         {
-            return Conflict(new { error = new { code = ex.Message, message = "Estatísticas já registradas para este jogador neste jogo." } });
+            return Conflict(new { error = new { code = ex.Message, message = "Estatísticas já registradas para este jogador neste mapa." } });
         }
+    }
+
+    /// <summary>GET /api/players/{id}/stats — public: get stats for a player.</summary>
+    [HttpGet("{id:guid}/stats")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetStats(Guid id)
+    {
+        var stats = await _matchStatsService.GetStatsByPlayerAsync(id);
+        return Ok(stats);
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
@@ -122,5 +130,5 @@ public class PlayersController : ControllerBase
 }
 
 public record CreatePlayerBody(string Nickname, string? RealName, Guid TeamId, string? PhotoUrl);
-public record RegisterStatsBody(Guid GameId, int Kills, int Deaths, int Assists,
-    double TotalDamage, int Rounds, double KastPercent);
+public record RegisterStatsBody(Guid MapResultId, int Kills, int Deaths, int Assists,
+    double TotalDamage, double KastPercent);

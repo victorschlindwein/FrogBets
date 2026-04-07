@@ -15,9 +15,6 @@ public class MatchStatsService : IMatchStatsService
 
     public async Task<MatchStatsDto> RegisterStatsAsync(RegisterStatsRequest request)
     {
-        if (request.Rounds <= 0)
-            throw new InvalidOperationException("INVALID_ROUNDS_COUNT");
-
         if (request.KastPercent < 0 || request.KastPercent > 100)
             throw new InvalidOperationException("INVALID_KAST_VALUE");
 
@@ -25,28 +22,28 @@ public class MatchStatsService : IMatchStatsService
         if (!playerExists)
             throw new InvalidOperationException("RESOURCE_NOT_FOUND");
 
-        var gameExists = await _db.Games.AnyAsync(g => g.Id == request.GameId);
-        if (!gameExists)
-            throw new InvalidOperationException("RESOURCE_NOT_FOUND");
+        var mapResult = await _db.MapResults.FirstOrDefaultAsync(m => m.Id == request.MapResultId);
+        if (mapResult is null)
+            throw new InvalidOperationException("MAP_RESULT_NOT_FOUND");
 
-        var duplicate = await _db.MatchStats.AnyAsync(s => s.PlayerId == request.PlayerId && s.GameId == request.GameId);
+        var duplicate = await _db.MatchStats.AnyAsync(s =>
+            s.PlayerId == request.PlayerId && s.MapResultId == request.MapResultId);
         if (duplicate)
             throw new InvalidOperationException("STATS_ALREADY_REGISTERED");
 
         var rating = RatingCalculator.Calculate(
             request.Kills, request.Deaths, request.Assists,
-            request.TotalDamage, request.Rounds, request.KastPercent);
+            request.TotalDamage, mapResult.Rounds, request.KastPercent);
 
         var stats = new MatchStats
         {
             Id          = Guid.NewGuid(),
             PlayerId    = request.PlayerId,
-            GameId      = request.GameId,
+            MapResultId = request.MapResultId,
             Kills       = request.Kills,
             Deaths      = request.Deaths,
             Assists     = request.Assists,
             TotalDamage = request.TotalDamage,
-            Rounds      = request.Rounds,
             KastPercent = request.KastPercent,
             Rating      = rating,
             CreatedAt   = DateTime.UtcNow,
@@ -61,9 +58,26 @@ public class MatchStatsService : IMatchStatsService
         await _db.SaveChangesAsync();
 
         return new MatchStatsDto(
-            stats.Id, stats.PlayerId, stats.GameId,
+            stats.Id, stats.PlayerId, stats.MapResultId,
+            mapResult.MapNumber, mapResult.Rounds,
             stats.Kills, stats.Deaths, stats.Assists,
-            stats.TotalDamage, stats.Rounds, stats.KastPercent,
+            stats.TotalDamage, stats.KastPercent,
             stats.Rating, stats.CreatedAt);
+    }
+
+    public async Task<MatchStatsDto[]> GetStatsByPlayerAsync(Guid playerId)
+    {
+        return await _db.MatchStats
+            .Where(s => s.PlayerId == playerId)
+            .Join(_db.MapResults,
+                s => s.MapResultId,
+                m => m.Id,
+                (s, m) => new MatchStatsDto(
+                    s.Id, s.PlayerId, s.MapResultId,
+                    m.MapNumber, m.Rounds,
+                    s.Kills, s.Deaths, s.Assists,
+                    s.TotalDamage, s.KastPercent,
+                    s.Rating, s.CreatedAt))
+            .ToArrayAsync();
     }
 }

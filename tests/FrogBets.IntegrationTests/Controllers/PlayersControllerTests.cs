@@ -136,23 +136,40 @@ public class PlayersControllerTests : IClassFixture<TestWebApplicationFactory>
         var team   = await SeedHelper.SeedTeamAsync(db);
         var player = await SeedHelper.SeedPlayerAsync(db, team.Id);
         var (game, _) = await SeedHelper.SeedGameWithMarketAsync(db);
+        var mapResult = await SeedHelper.SeedMapResultAsync(db, game.Id, mapNumber: 1, rounds: 30);
         var client = _factory.CreateClient();
         AuthHelper.SetBearerToken(client, admin.Id, admin.Username, isAdmin: true);
 
         // Act
         var res = await client.PostAsJsonAsync($"/api/players/{player.Id}/stats", new
         {
-            gameId      = game.Id,
+            mapResultId = mapResult.Id,
             kills       = 20,
             deaths      = 10,
             assists     = 5,
             totalDamage = 2500.0,
-            rounds      = 30,
             kastPercent = 75.0,
         });
 
         // Assert
         Assert.Equal(HttpStatusCode.Created, res.StatusCode);
+    }
+
+    // ── GET /api/players/:id/stats ────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetStats_IsPublic_Returns200()
+    {
+        // Arrange
+        using var db = SeedHelper.GetDb(_factory);
+        var team   = await SeedHelper.SeedTeamAsync(db);
+        var player = await SeedHelper.SeedPlayerAsync(db, team.Id);
+
+        // Act
+        var res = await _factory.CreateClient().GetAsync($"/api/players/{player.Id}/stats");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────

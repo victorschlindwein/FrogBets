@@ -128,9 +128,12 @@ Onde: KPR = kills/rounds, DPR = deaths/rounds, ADR = damage/rounds, Impact = KPR
 ### Usuários
 | Método | Rota | Auth | Descrição |
 |---|---|---|---|
+| GET | `/api/users` | Admin | Listar todos os usuários (id, username, isAdmin, isTeamLeader, teamId) |
 | GET | `/api/users/me` | JWT | Perfil do usuário autenticado (inclui `isTeamLeader` e `teamId`) |
 | GET | `/api/users/me/balance` | JWT | Saldo virtual e reservado |
 | PATCH | `/api/users/{id}/team` | JWT (líder/admin) | Mover usuário de time |
+| POST | `/api/users/{id}/promote` | Admin | Conceder papel de admin a um usuário |
+| POST | `/api/users/{id}/demote` | Admin | Revogar papel de admin (não funciona no master admin) |
 
 ### Jogos
 | Método | Rota | Auth | Descrição |
@@ -260,6 +263,7 @@ dotnet ef migrations add NomeDaMigracao --startup-project ../FrogBets.Api
 | `POSTGRES_PASSWORD` | Senha do PostgreSQL |
 | `JWT_KEY` | Chave secreta JWT (mín. 32 chars) — gere com `openssl rand -base64 32` |
 | `ALLOWED_ORIGINS` | Origens CORS permitidas (ex: `https://frogbets.example.com`) |
+| `MasterAdminUsername` | Username do admin master — protegido contra revogação de direitos via API |
 
 Em produção, os valores são armazenados no AWS SSM Parameter Store e injetados nas tasks ECS. Nunca commite o arquivo `.env`.
 

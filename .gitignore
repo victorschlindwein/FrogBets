@@ -27,6 +27,10 @@ appsettings.*.json
 !.env.example
 infra/.tmp/
 
+# Cypress artifacts
+frontend/cypress/screenshots/
+frontend/cypress/videos/
+
 # OS
 .DS_Store
 Thumbs.db

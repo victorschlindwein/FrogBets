@@ -9,6 +9,7 @@ interface Me {
 
 export default function Navbar() {
   const [me, setMe] = useState<Me | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -24,19 +25,33 @@ export default function Navbar() {
     navigate('/login')
   }
 
+  function closeMenu() { setMenuOpen(false) }
+
   return (
     <nav className="navbar">
       <span className="nav-brand">🐸 FrogBets</span>
-      <Link to="/">Dashboard</Link>
-      <Link to="/games">Jogos</Link>
-      <Link to="/bets">Minhas Apostas</Link>
-      <Link to="/marketplace">Marketplace</Link>
-      <Link to="/leaderboard">Ranking Apostas</Link>
-      <Link to="/players/ranking">Ranking CS2</Link>
-      {me?.isAdmin && <Link to="/admin">Admin</Link>}
-      <span className="nav-spacer" />
-      <span className="nav-user">{me?.username}</span>
-      <button className="btn-orange" onClick={handleLogout} style={{ padding: '.4rem .9rem', fontSize: '.85rem' }}>Sair</button>
+
+      <button
+        className="nav-toggle"
+        aria-label="Abrir menu"
+        aria-expanded={menuOpen}
+        onClick={() => setMenuOpen(o => !o)}
+      >
+        {menuOpen ? '✕' : '☰'}
+      </button>
+
+      <div className={`nav-links${menuOpen ? ' open' : ''}`}>
+        <Link to="/" onClick={closeMenu}>Dashboard</Link>
+        <Link to="/games" onClick={closeMenu}>Jogos</Link>
+        <Link to="/bets" onClick={closeMenu}>Minhas Apostas</Link>
+        <Link to="/marketplace" onClick={closeMenu}>Marketplace</Link>
+        <Link to="/leaderboard" onClick={closeMenu}>Ranking Apostas</Link>
+        <Link to="/players/ranking" onClick={closeMenu}>Ranking CS2</Link>
+        {me?.isAdmin && <Link to="/admin" onClick={closeMenu}>Admin</Link>}
+        <span className="nav-spacer" />
+        <span className="nav-user">{me?.username}</span>
+        <button className="btn-orange" onClick={handleLogout} style={{ padding: '.4rem .9rem', fontSize: '.85rem' }}>Sair</button>
+      </div>
     </nav>
   )
 }

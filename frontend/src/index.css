@@ -79,6 +79,14 @@ nav.navbar .nav-user {
   font-size: .9rem;
 }
 
+/* Botão hamburguer — escondido em desktop */
+.nav-toggle { display: none; }
+
+/* Links da navbar — visíveis em desktop */
+.nav-links {
+  display: contents; /* herda o flex do nav pai */
+}
+
 /* ── Card ────────────────────────────────────────────────────────────────── */
 .card {
   background: var(--white);
@@ -408,4 +416,132 @@ section + section { margin-top: 2rem; }
 .page-admin {
   margin-left: auto;
   padding-left: 210px;
+}
+
+/* ── Responsividade Mobile ───────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Navbar mobile */
+  nav.navbar {
+    padding: .6rem 1rem;
+    flex-wrap: wrap;
+    gap: .5rem;
+  }
+
+  nav.navbar .nav-brand {
+    flex: 1;
+  }
+
+  .nav-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: var(--cream);
+    font-size: 1.4rem;
+    cursor: pointer;
+    padding: .25rem .5rem;
+    margin-left: auto;
+  }
+
+  .nav-links {
+    display: none;
+    flex-direction: column;
+    width: 100%;
+    gap: .25rem;
+    padding: .5rem 0;
+    border-top: 1px solid rgba(255,255,255,.15);
+  }
+
+  .nav-links.open {
+    display: flex;
+  }
+
+  .nav-links a, .nav-links .nav-user {
+    padding: .4rem .25rem;
+    font-size: .95rem;
+  }
+
+  .nav-links .nav-spacer { display: none; }
+
+  .nav-links .btn-orange {
+    width: 100%;
+    margin-top: .25rem;
+  }
+
+  /* Layout */
+  .page {
+    padding-top: 4.5rem;
+    margin: 0;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  /* Admin: esconde sidebar lateral, usa nav horizontal */
+  .admin-index {
+    position: static;
+    width: 100%;
+    margin-bottom: 1.25rem;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--white);
+  }
+
+  .admin-index ul {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: .25rem;
+  }
+
+  .admin-index ul li a {
+    white-space: normal;
+    font-size: .75rem;
+    padding: .25rem .4rem;
+    background: var(--cream);
+  }
+
+  .page-admin {
+    padding-left: 1rem;
+  }
+
+  /* Tabelas com scroll horizontal */
+  .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 500px;
+  }
+
+  /* Stats grid */
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Bet card */
+  .bet-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* Game item */
+  .game-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: .5rem;
+  }
+
+  h1 { font-size: 1.4rem; }
+  h2 { font-size: 1.1rem; }
+}
+
+@media (max-width: 480px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-card {
+    padding: 1.75rem 1.25rem;
+  }
 }

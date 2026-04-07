@@ -4,6 +4,7 @@ using FrogBets.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace FrogBets.Api.Controllers;
 
@@ -13,11 +14,13 @@ public class UsersController : ControllerBase
 {
     private readonly FrogBetsDbContext _db;
     private readonly ITeamMembershipService _teamMembershipService;
+    private readonly string _masterAdminUsername;
 
-    public UsersController(FrogBetsDbContext db, ITeamMembershipService teamMembershipService)
+    public UsersController(FrogBetsDbContext db, ITeamMembershipService teamMembershipService, IConfiguration config)
     {
         _db = db;
         _teamMembershipService = teamMembershipService;
+        _masterAdminUsername = config["MasterAdminUsername"] ?? string.Empty;
     }
 
     /// <summary>GET /api/users/me — returns the authenticated user's profile.</summary>
@@ -99,6 +102,69 @@ public class UsersController : ControllerBase
         {
             return StatusCode(403, new { error = new { code = ex.Message, message = "Acesso negado." } });
         }
+    }
+
+    /// <summary>GET /api/users — admin: list all users with id, username, isAdmin, teamId.</summary>
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> ListUsers()
+    {
+        if (User.FindFirstValue("isAdmin") != "true")
+            return StatusCode(403, new { error = new { code = "FORBIDDEN", message = "Acesso negado." } });
+
+        var users = await _db.Users.AsNoTracking()
+            .OrderBy(u => u.Username)
+            .Select(u => new
+            {
+                id           = u.Id,
+                username     = u.Username,
+                isAdmin      = u.IsAdmin,
+                isTeamLeader = u.IsTeamLeader,
+                teamId       = u.TeamId,
+                createdAt    = u.CreatedAt,
+            })
+            .ToListAsync();
+
+        return Ok(users);
+    }
+
+    /// <summary>POST /api/users/{id}/promote — admin: grant admin role to a user.</summary>
+    [HttpPost("{id:guid}/promote")]
+    [Authorize]
+    public async Task<IActionResult> PromoteToAdmin(Guid id)
+    {
+        if (User.FindFirstValue("isAdmin") != "true")
+            return StatusCode(403, new { error = new { code = "FORBIDDEN", message = "Acesso negado." } });
+
+        var target = await _db.Users.FirstOrDefaultAsync(u => u.Id == id);
+        if (target is null)
+            return NotFound(new { error = new { code = "USER_NOT_FOUND", message = "Usuário não encontrado." } });
+
+        target.IsAdmin = true;
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    /// <summary>POST /api/users/{id}/demote — admin: revoke admin role from a user. Cannot demote master admin.</summary>
+    [HttpPost("{id:guid}/demote")]
+    [Authorize]
+    public async Task<IActionResult> DemoteFromAdmin(Guid id)
+    {
+        if (User.FindFirstValue("isAdmin") != "true")
+            return StatusCode(403, new { error = new { code = "FORBIDDEN", message = "Acesso negado." } });
+
+        var target = await _db.Users.FirstOrDefaultAsync(u => u.Id == id);
+        if (target is null)
+            return NotFound(new { error = new { code = "USER_NOT_FOUND", message = "Usuário não encontrado." } });
+
+        // Protege o usuário master de ter seus direitos revogados
+        if (!string.IsNullOrEmpty(_masterAdminUsername) &&
+            target.Username.Equals(_masterAdminUsername, StringComparison.OrdinalIgnoreCase))
+            return StatusCode(403, new { error = new { code = "FORBIDDEN", message = "Não é possível revogar os direitos do administrador master." } });
+
+        target.IsAdmin = false;
+        await _db.SaveChangesAsync();
+        return NoContent();
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────

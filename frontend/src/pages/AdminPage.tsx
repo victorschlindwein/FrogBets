@@ -24,6 +24,8 @@ function marketLabel(m: Market) {
 
 // ── Índice de navegação ───────────────────────────────────────────────────
 const NAV_ITEMS = [
+  { id: 'sec-users',       label: '👥 Usuários' },
+  { id: 'sec-admins',      label: '🔐 Admins' },
   { id: 'sec-games',       label: '🎮 Cadastrar Jogo' },
   { id: 'sec-start',       label: '▶️ Iniciar Jogo' },
   { id: 'sec-result',      label: '🏁 Registrar Resultado' },
@@ -47,6 +49,175 @@ function AdminNav() {
         ))}
       </ul>
     </nav>
+  )
+}
+
+// ── Lista de Usuários ─────────────────────────────────────────────────────
+function UsersSection({ currentUser }: { currentUser: User }) {
+  const [users, setUsers] = useState<User[]>([])
+  const [copied, setCopied] = useState<string | null>(null)
+
+  function loadUsers() {
+    apiClient.get<User[]>('/users').then(res => setUsers(res.data)).catch(() => {})
+  }
+  useEffect(() => { loadUsers() }, [])
+
+  function copyId(id: string) {
+    navigator.clipboard.writeText(id).then(() => {
+      setCopied(id)
+      setTimeout(() => setCopied(null), 1500)
+    })
+  }
+
+  return (
+    <section id="sec-users">
+      <h2>👥 Usuários</h2>
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="table-wrapper">
+          <table>
+            <thead>
+              <tr><th>Username</th><th>ID</th><th>Admin</th><th>Líder</th><th>Time ID</th></tr>
+            </thead>
+            <tbody>
+              {users.map(u => (
+                <tr key={u.id}>
+                  <td>
+                    {u.username}
+                    {u.id === currentUser.id && <span className="badge badge-active" style={{ marginLeft: '.5rem' }}>você</span>}
+                  </td>
+                  <td>
+                    <code style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>{u.id}</code>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => copyId(u.id)}
+                      style={{ marginLeft: '.5rem', padding: '.15rem .5rem', fontSize: '.75rem' }}
+                      title="Copiar ID"
+                    >
+                      {copied === u.id ? '✓' : '📋'}
+                    </button>
+                  </td>
+                  <td>{u.isAdmin ? '✅' : '—'}</td>
+                  <td>{(u as unknown as { isTeamLeader: boolean }).isTeamLeader ? '✅' : '—'}</td>
+                  <td>
+                    {(u as unknown as { teamId: string | null }).teamId
+                      ? <code style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>{(u as unknown as { teamId: string }).teamId}</code>
+                      : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ── Gestão de Admins ──────────────────────────────────────────────────────
+function AdminManagementSection({ users, currentUser, onUsersChange }: {
+  users: User[]
+  currentUser: User
+  onUsersChange: () => void
+}) {
+  const [submitting, setSubmitting] = useState<string | null>(null)
+  const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+
+  async function promote(userId: string) {
+    setSubmitting(userId); setMessage(null)
+    try {
+      await apiClient.post(`/users/${userId}/promote`)
+      setMessage({ type: 'ok', text: 'Usuário promovido a admin.' })
+      onUsersChange()
+    } catch (err: unknown) {
+      const e2 = err as { response?: { data?: { error?: { message?: string } } } }
+      setMessage({ type: 'err', text: e2.response?.data?.error?.message ?? 'Erro ao promover.' })
+    } finally { setSubmitting(null) }
+  }
+
+  async function demote(userId: string) {
+    setSubmitting(userId); setMessage(null)
+    try {
+      await apiClient.post(`/users/${userId}/demote`)
+      setMessage({ type: 'ok', text: 'Direitos de admin revogados.' })
+      onUsersChange()
+    } catch (err: unknown) {
+      const e2 = err as { response?: { data?: { error?: { message?: string } } } }
+      setMessage({ type: 'err', text: e2.response?.data?.error?.message ?? 'Erro ao revogar.' })
+    } finally { setSubmitting(null) }
+  }
+
+  const nonAdmins = users.filter(u => !u.isAdmin)
+  const admins    = users.filter(u => u.isAdmin && u.id !== currentUser.id)
+
+  return (
+    <section id="sec-admins">
+      <h2>🔐 Gestão de Admins</h2>
+
+      <div className="card">
+        <h3>Promover a Admin</h3>
+        {nonAdmins.length === 0
+          ? <p style={{ color: 'var(--text-muted)', fontSize: '.9rem' }}>Todos os usuários já são admins.</p>
+          : <div className="table-wrapper">
+              <table>
+                <thead><tr><th>Username</th><th>Ação</th></tr></thead>
+                <tbody>
+                  {nonAdmins.map(u => (
+                    <tr key={u.id}>
+                      <td>{u.username}</td>
+                      <td>
+                        <button
+                          type="button"
+                          onClick={() => promote(u.id)}
+                          disabled={submitting === u.id}
+                          style={{ padding: '.3rem .7rem', fontSize: '.8rem' }}
+                        >
+                          {submitting === u.id ? '...' : 'Promover'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+        }
+      </div>
+
+      <div className="card" style={{ marginTop: '1rem' }}>
+        <h3>Revogar Admin</h3>
+        {admins.length === 0
+          ? <p style={{ color: 'var(--text-muted)', fontSize: '.9rem' }}>Nenhum outro admin para revogar.</p>
+          : <div className="table-wrapper">
+              <table>
+                <thead><tr><th>Username</th><th>Ação</th></tr></thead>
+                <tbody>
+                  {admins.map(u => (
+                    <tr key={u.id}>
+                      <td>{u.username}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn-danger"
+                          onClick={() => demote(u.id)}
+                          disabled={submitting === u.id}
+                          style={{ padding: '.3rem .7rem', fontSize: '.8rem' }}
+                        >
+                          {submitting === u.id ? '...' : 'Revogar'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+        }
+        {message && (
+          <p role={message.type === 'ok' ? 'status' : 'alert'} style={{ marginTop: '.75rem' }}>
+            {message.text}
+          </p>
+        )}
+      </div>
+    </section>
   )
 }
 
@@ -337,6 +508,7 @@ function InvitesSection() {
       </div>
       {invites.length > 0 && (
         <div className="card" style={{ padding: 0, overflow: 'hidden', marginTop: '1rem' }}>
+          <div className="table-wrapper">
           <table>
             <thead>
               <tr><th>Token</th><th>Descrição</th><th>Status</th><th>Criado em</th><th>Expira em</th><th>Ação</th></tr>
@@ -358,6 +530,7 @@ function InvitesSection() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </section>
@@ -413,6 +586,7 @@ function TeamsSection({ onTeamsChange }: { onTeamsChange: (teams: CS2Team[]) => 
       </div>
       {teams.length > 0 && (
         <div className="card" style={{ padding: 0, overflow: 'hidden', marginTop: '1rem' }}>
+          <div className="table-wrapper">
           <table>
             <thead><tr><th>Nome</th><th>Logo</th><th>Criado em</th></tr></thead>
             <tbody>
@@ -434,6 +608,7 @@ function TeamsSection({ onTeamsChange }: { onTeamsChange: (teams: CS2Team[]) => 
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </section>
@@ -502,6 +677,7 @@ function PlayersSection({ teams }: { teams: CS2Team[] }) {
       </div>
       {players.length > 0 && (
         <div className="card" style={{ padding: 0, overflow: 'hidden', marginTop: '1rem' }}>
+          <div className="table-wrapper">
           <table>
             <thead><tr><th>Nickname</th><th>Time</th><th>Score Atual</th><th>Partidas</th></tr></thead>
             <tbody>
@@ -515,6 +691,7 @@ function PlayersSection({ teams }: { teams: CS2Team[] }) {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </section>
@@ -774,6 +951,7 @@ function DirectSwapSection() {
 // ── Página principal ──────────────────────────────────────────────────────
 export default function AdminPage() {
   const [user, setUser] = useState<User | null>(null)
+  const [users, setUsers] = useState<User[]>([])
   const [games, setGames] = useState<Game[]>([])
   const [teams, setTeams] = useState<CS2Team[]>([])
   const [loading, setLoading] = useState(true)
@@ -783,11 +961,15 @@ export default function AdminPage() {
     apiClient.get<Game[]>('/games').then(res => setGames(res.data)).catch(() => {})
   }
 
+  function loadUsers() {
+    apiClient.get<User[]>('/users').then(res => setUsers(res.data)).catch(() => {})
+  }
+
   useEffect(() => {
     apiClient.get<User>('/users/me')
       .then(res => {
         if (!res.data.isAdmin) { setAccessDenied(true) }
-        else { setUser(res.data); loadGames() }
+        else { setUser(res.data); loadGames(); loadUsers() }
       })
       .catch(() => setAccessDenied(true))
       .finally(() => setLoading(false))
@@ -800,6 +982,8 @@ export default function AdminPage() {
     <div className="page page-admin">
       <h1>⚙️ Administração</h1>
       <AdminNav />
+      <UsersSection currentUser={user} />
+      <AdminManagementSection users={users} currentUser={user} onUsersChange={loadUsers} />
       <CreateGameForm teams={teams} onCreated={loadGames} />
       <StartGameSection games={games} onStarted={loadGames} />
       <RegisterResultSection games={games} />

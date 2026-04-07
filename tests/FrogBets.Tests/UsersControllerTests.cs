@@ -29,7 +29,8 @@ public class UsersControllerTests
     private static UsersController CreateController(FrogBetsDbContext db, Guid? authenticatedUserId = null)
     {
         var teamMembershipService = new StubTeamMembershipService();
-        var controller = new UsersController(db, teamMembershipService);
+        var config = new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build();
+        var controller = new UsersController(db, teamMembershipService, config);
 
         if (authenticatedUserId.HasValue)
         {

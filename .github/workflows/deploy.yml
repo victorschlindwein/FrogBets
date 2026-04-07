@@ -152,7 +152,8 @@ jobs:
                 {"name": "ASPNETCORE_ENVIRONMENT", "value": "Production"},
                 {"name": "Jwt__Issuer", "value": "FrogBets"},
                 {"name": "Jwt__Audience", "value": "FrogBets"},
-                {"name": "Jwt__ExpirationMinutes", "value": "60"}
+                {"name": "Jwt__ExpirationMinutes", "value": "60"},
+                {"name": "AllowedOrigins", "value": "http://frogbets-alb-1873636362.sa-east-1.elb.amazonaws.com"}
               ],
               "secrets": [
                 {"name": "ConnectionStrings__DefaultConnection", "valueFrom": "arn:aws:ssm:$AWS_REGION:$ACCOUNT_ID:parameter/frogbets/db-connection-string"},

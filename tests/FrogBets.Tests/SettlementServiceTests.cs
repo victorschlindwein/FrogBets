@@ -273,10 +273,11 @@ public class SettlementServiceTests
     // ── Game status → Finished ────────────────────────────────────────────────
 
     [Fact]
-    public async Task SettleMarket_AllMarketsSettled_GameBecomesFinished()
+    public async Task SettleMarket_AllMarketsSettled_GameStatusUnchangedBySettlementService()
     {
+        // After the refactor, GameService is responsible for setting game status to Finished.
+        // SettlementService only settles bets — it no longer touches game status.
         await using var db = CreateDb();
-        // Create a game with a single market already settled
         var game = new Game
         {
             Id           = Guid.NewGuid(),
@@ -301,11 +302,11 @@ public class SettlementServiceTests
         await db.SaveChangesAsync();
 
         var svc = CreateService(db);
-        // No active bets, but all markets are already Settled → game should finish
         await svc.SettleMarketAsync(market.Id, "TeamA");
 
+        // SettlementService no longer sets game to Finished — GameService does that.
         var updatedGame = await db.Games.FindAsync(game.Id);
-        Assert.Equal(GameStatus.Finished, updatedGame!.Status);
+        Assert.Equal(GameStatus.InProgress, updatedGame!.Status);
     }
 
     [Fact]

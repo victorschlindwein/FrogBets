@@ -47,6 +47,10 @@ public class PlayersController : ControllerBase
         {
             return Conflict(new { error = new { code = ex.Message, message = "Já existe um jogador com esse nickname." } });
         }
+        catch (InvalidOperationException ex) when (ex.Message == "INVALID_PHOTO_URL")
+        {
+            return BadRequest(new { error = new { code = ex.Message, message = "URL da foto deve usar http:// ou https://." } });
+        }
     }
 
     /// <summary>GET /api/players — admin: list all players.</summary>

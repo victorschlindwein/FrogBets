@@ -58,7 +58,8 @@ public class BetsController : ControllerBase
             "MARKET_NOT_OPEN" or
             "GAME_ALREADY_STARTED" or
             "DUPLICATE_BET_ON_MARKET" or
-            "INSUFFICIENT_BALANCE")
+            "INSUFFICIENT_BALANCE" or
+            "INVALID_BET_OPTION")
         {
             var message = ex.Message switch
             {
@@ -66,6 +67,7 @@ public class BetsController : ControllerBase
                 "GAME_ALREADY_STARTED"     => "O jogo já foi iniciado e não aceita novas apostas.",
                 "DUPLICATE_BET_ON_MARKET"  => "Você já possui uma aposta neste mercado.",
                 "INSUFFICIENT_BALANCE"     => "Saldo Virtual insuficiente para realizar esta aposta.",
+                "INVALID_BET_OPTION"       => "Opção de aposta inválida para este tipo de mercado.",
                 _                          => ex.Message,
             };
 

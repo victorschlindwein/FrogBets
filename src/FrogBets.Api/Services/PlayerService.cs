@@ -26,6 +26,11 @@ public class PlayerService : IPlayerService
         if (nicknameExists)
             throw new InvalidOperationException("PLAYER_NICKNAME_ALREADY_EXISTS");
 
+        if (!string.IsNullOrWhiteSpace(request.PhotoUrl) &&
+            !request.PhotoUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            !request.PhotoUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("INVALID_PHOTO_URL");
+
         var player = new CS2Player
         {
             Id           = Guid.NewGuid(),

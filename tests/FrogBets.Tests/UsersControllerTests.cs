@@ -10,8 +10,9 @@ using Microsoft.EntityFrameworkCore;
 namespace FrogBets.Tests;
 
 /// <summary>
-/// Unit tests for UsersController — register, profile and balance endpoints.
-/// Requirements: 1.2, 2.1, 2.2, 2.9
+/// Unit tests for UsersController — profile and balance endpoints.
+/// Requirements: 1.2, 2.9
+/// Note: Registration is handled by AuthController (invite-based). See AuthServiceTests.
 /// </summary>
 public class UsersControllerTests
 {
@@ -64,70 +65,6 @@ public class UsersControllerTests
         db.Users.Add(user);
         await db.SaveChangesAsync();
         return user;
-    }
-
-    // ── POST /api/users/register ──────────────────────────────────────────────
-
-    [Fact]
-    public async Task Register_NewUser_Returns201WithIdUsernameAndBalance()
-    {
-        await using var db = CreateDb();
-        var controller = CreateController(db);
-
-        var result = await controller.Register(new RegisterRequest("alice", "secret123"));
-
-        var created = Assert.IsType<CreatedAtActionResult>(result);
-        Assert.Equal(201, created.StatusCode);
-
-        var json = System.Text.Json.JsonSerializer.Serialize(created.Value);
-        Assert.Contains("alice", json);
-        Assert.Contains("1000", json);
-        // id must be a non-empty GUID
-        Assert.Matches(@"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", json);
-    }
-
-    /// <summary>Requirement 2.2 — new user gets 1000 initial virtual balance.</summary>
-    [Fact]
-    public async Task Register_NewUser_AssignsInitialBalanceOf1000()
-    {
-        await using var db = CreateDb();
-        var controller = CreateController(db);
-
-        await controller.Register(new RegisterRequest("bob", "pass"));
-
-        var user = await db.Users.SingleAsync(u => u.Username == "bob");
-        Assert.Equal(1000m, user.VirtualBalance);
-        Assert.Equal(0m, user.ReservedBalance);
-    }
-
-    [Fact]
-    public async Task Register_NewUser_PasswordIsHashed()
-    {
-        await using var db = CreateDb();
-        var controller = CreateController(db);
-
-        await controller.Register(new RegisterRequest("carol", "mypassword"));
-
-        var user = await db.Users.SingleAsync(u => u.Username == "carol");
-        Assert.NotEqual("mypassword", user.PasswordHash);
-        Assert.True(BCrypt.Net.BCrypt.Verify("mypassword", user.PasswordHash));
-    }
-
-    [Fact]
-    public async Task Register_DuplicateUsername_Returns409WithUsernameTakenCode()
-    {
-        await using var db = CreateDb();
-        await SeedUserAsync(db, username: "dave");
-        var controller = CreateController(db);
-
-        var result = await controller.Register(new RegisterRequest("dave", "newpass"));
-
-        var conflict = Assert.IsType<ConflictObjectResult>(result);
-        Assert.Equal(409, conflict.StatusCode);
-
-        // Verify error structure
-        var json = System.Text.Json.JsonSerializer.Serialize(conflict.Value);
-        Assert.Contains("USERNAME_TAKEN", json);
     }
 
     // ── GET /api/users/me ─────────────────────────────────────────────────────

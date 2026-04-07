@@ -1,7 +1,5 @@
-using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using FrogBets.Api.Services;
-using FrogBets.Domain.Entities;
 using FrogBets.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -20,46 +18,6 @@ public class UsersController : ControllerBase
     {
         _db = db;
         _teamMembershipService = teamMembershipService;
-    }
-
-    /// <summary>POST /api/users/register — creates a new user with 1000 initial balance.</summary>
-    [HttpPost("register")]
-    [AllowAnonymous]
-    public async Task<IActionResult> Register([FromBody] RegisterRequest request)
-    {
-        var exists = await _db.Users.AnyAsync(u => u.Username == request.Username);
-        if (exists)
-        {
-            return Conflict(new
-            {
-                error = new
-                {
-                    code = "USERNAME_TAKEN",
-                    message = "Nome de usuário já está em uso."
-                }
-            });
-        }
-
-        var user = new User
-        {
-            Id             = Guid.NewGuid(),
-            Username       = request.Username,
-            PasswordHash   = BCrypt.Net.BCrypt.HashPassword(request.Password),
-            IsAdmin        = false,
-            VirtualBalance = 1000m,   // Requirement 2.2 — initial balance
-            ReservedBalance = 0m,
-            CreatedAt      = DateTime.UtcNow,
-        };
-
-        _db.Users.Add(user);
-        await _db.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(GetMe), null, new
-        {
-            id             = user.Id,
-            username       = user.Username,
-            virtualBalance = user.VirtualBalance,
-        });
     }
 
     /// <summary>GET /api/users/me — returns the authenticated user's profile.</summary>
@@ -150,10 +108,5 @@ public class UsersController : ControllerBase
         return Guid.TryParse(sub, out var id) ? id : null;
     }
 }
-
-public record RegisterRequest(
-    [Required][StringLength(50, MinimumLength = 3)] string Username,
-    [Required][StringLength(200, MinimumLength = 8)] string Password
-);
 
 public record MoveUserTeamBody(Guid? TeamId);

@@ -53,7 +53,7 @@ public sealed class TokenBlocklist
     private void EnsureLoaded()
     {
         if (_loaded) return;
-        lock (_cache)
+        lock (this)
         {
             if (_loaded) return;
             using var scope = _scopeFactory.CreateScope();

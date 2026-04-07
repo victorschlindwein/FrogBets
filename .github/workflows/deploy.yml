@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  AWS_REGION: us-east-1
+  AWS_REGION: sa-east-1
   API_ECR_REPO: frogbets-api
   FRONTEND_ECR_REPO: frogbets-frontend
 
@@ -41,7 +41,7 @@ jobs:
         working-directory: frontend
         run: |
           npm ci
-          npm run test -- --run
+          npm run test
 
   # ── 2. Build & Push imagens ──────────────────────────────────────────────
   build-and-push:

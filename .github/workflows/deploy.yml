@@ -108,6 +108,7 @@ jobs:
             --tag "$REGISTRY/$FRONTEND_ECR_REPO:latest" \
             --cache-from type=gha \
             --cache-to type=gha,mode=max \
+            --progress=plain \
             --push .
           echo "image=$IMAGE" >> $GITHUB_OUTPUT
 

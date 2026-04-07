@@ -352,11 +352,11 @@ section + section { margin-top: 2rem; }
   background: var(--cream);
 }
 
-/* ── Admin index nav (flutuante lateral direita, translúcido) ────────────── */
+/* ── Admin index nav (flutuante lateral esquerda, translúcido) ───────────── */
 .admin-index {
   position: fixed;
   top: 4.5rem;   /* abaixo da navbar fixa */
-  right: 1.25rem;
+  left: 1.25rem;
   z-index: 100;
   width: 190px;
   background: rgba(255, 255, 255, 0.75);
@@ -404,7 +404,8 @@ section + section { margin-top: 2rem; }
   text-decoration: none;
 }
 
-/* Página admin centralizada normalmente, sem margin extra */
+/* Página admin com margem esquerda para o índice fixo */
 .page-admin {
   margin-left: auto;
+  padding-left: 210px;
 }

@@ -105,8 +105,8 @@ public class FrogBetsDbContext : DbContext
             e.HasIndex(b => b.CreatorId);
             e.HasIndex(b => b.CoveredById);
             e.HasIndex(b => b.Status);
-            // Unique: one pending/active bet per user per market
-            e.HasIndex(b => new { b.MarketId, b.CreatorId });
+            // Unique filtered index created via migration: IX_Bets_MarketId_CreatorId_Unique
+            // Enforces one pending/active bet per user per market (WHERE Status IN (Pending, Active))
         });
 
         // GameResult

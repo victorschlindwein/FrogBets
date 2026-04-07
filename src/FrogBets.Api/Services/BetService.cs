@@ -19,48 +19,68 @@ public class BetService : IBetService
     /// <inheritdoc/>
     public async Task<Guid> CreateBetAsync(Guid creatorId, Guid marketId, string creatorOption, decimal amount)
     {
-        // Load market with its game
-        var market = await _db.Markets
-            .Include(m => m.Game)
-            .FirstOrDefaultAsync(m => m.Id == marketId)
-            ?? throw new KeyNotFoundException($"Market {marketId} not found.");
+        // Use a Serializable transaction to prevent TOCTOU race on duplicate-bet check + balance reservation
+        await using var tx = await _db.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable);
 
-        // Validate market is open
-        if (market.Status != MarketStatus.Open)
-            throw new InvalidOperationException("MARKET_NOT_OPEN");
-
-        // Validate game is still scheduled (not started)
-        if (market.Game.Status != GameStatus.Scheduled)
-            throw new InvalidOperationException("GAME_ALREADY_STARTED");
-
-        // Validate no duplicate bet by same user on same market
-        var hasDuplicate = await _db.Bets.AnyAsync(b =>
-            b.MarketId == marketId &&
-            b.CreatorId == creatorId &&
-            (b.Status == BetStatus.Pending || b.Status == BetStatus.Active));
-
-        if (hasDuplicate)
-            throw new InvalidOperationException("DUPLICATE_BET_ON_MARKET");
-
-        // Reserve balance — throws INSUFFICIENT_BALANCE if not enough
-        await _balanceService.ReserveBalanceAsync(creatorId, amount);
-
-        // Create the bet
-        var bet = new Bet
+        try
         {
-            Id            = Guid.NewGuid(),
-            MarketId      = marketId,
-            CreatorId     = creatorId,
-            CreatorOption = creatorOption,
-            Amount        = amount,
-            Status        = BetStatus.Pending,
-            CreatedAt     = DateTime.UtcNow,
-        };
+            // Load market with its game
+            var market = await _db.Markets
+                .Include(m => m.Game)
+                .FirstOrDefaultAsync(m => m.Id == marketId)
+                ?? throw new KeyNotFoundException($"Market {marketId} not found.");
 
-        _db.Bets.Add(bet);
-        await _db.SaveChangesAsync();
+            // Validate market is open
+            if (market.Status != MarketStatus.Open)
+                throw new InvalidOperationException("MARKET_NOT_OPEN");
 
-        return bet.Id;
+            // Validate game is still scheduled (not started)
+            if (market.Game.Status != GameStatus.Scheduled)
+                throw new InvalidOperationException("GAME_ALREADY_STARTED");
+
+            // Validate no duplicate bet by same user on same market
+            var hasDuplicate = await _db.Bets.AnyAsync(b =>
+                b.MarketId == marketId &&
+                b.CreatorId == creatorId &&
+                (b.Status == BetStatus.Pending || b.Status == BetStatus.Active));
+
+            if (hasDuplicate)
+                throw new InvalidOperationException("DUPLICATE_BET_ON_MARKET");
+
+            // Load user and reserve balance inline (avoiding nested transaction)
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == creatorId)
+                ?? throw new KeyNotFoundException($"User {creatorId} not found.");
+
+            if (user.VirtualBalance < amount)
+                throw new InvalidOperationException("INSUFFICIENT_BALANCE");
+
+            user.VirtualBalance -= amount;
+            user.ReservedBalance += amount;
+
+            // Create the bet
+            var bet = new Bet
+            {
+                Id            = Guid.NewGuid(),
+                MarketId      = marketId,
+                CreatorId     = creatorId,
+                CreatorOption = creatorOption,
+                Amount        = amount,
+                Status        = BetStatus.Pending,
+                CreatedAt     = DateTime.UtcNow,
+            };
+
+            _db.Bets.Add(bet);
+            await _db.SaveChangesAsync();
+            await tx.CommitAsync();
+
+            return bet.Id;
+        }
+        catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("IX_Bets_MarketId_CreatorId_Unique") == true)
+        {
+            // Unique constraint violation — concurrent bet slipped through
+            throw new InvalidOperationException("DUPLICATE_BET_ON_MARKET");
+        }
     }
 
     /// <inheritdoc/>

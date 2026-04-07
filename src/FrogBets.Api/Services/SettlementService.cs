@@ -18,6 +18,10 @@ public class SettlementService : ISettlementService
     /// <inheritdoc/>
     public async Task SettleMarketAsync(Guid marketId, string winningOption, bool isVoided = false)
     {
+        // Use a single Serializable transaction to ensure atomic settlement of all bets
+        await using var tx = await _db.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable);
+
         var market = await _db.Markets
             .Include(m => m.Game)
             .ThenInclude(g => g.Markets)
@@ -30,13 +34,27 @@ public class SettlementService : ISettlementService
 
         var now = DateTime.UtcNow;
 
+        // Load all affected users once
+        var affectedUserIds = activeBets
+            .SelectMany(b => new[] { b.CreatorId, b.CoveredById!.Value })
+            .Distinct()
+            .ToList();
+        var users = await _db.Users
+            .Where(u => affectedUserIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id);
+
         foreach (var bet in activeBets)
         {
             if (isVoided)
             {
-                // Return stakes to both sides
-                await _balanceService.ReleaseBalanceAsync(bet.CreatorId, bet.Amount);
-                await _balanceService.ReleaseBalanceAsync(bet.CoveredById!.Value, bet.Amount);
+                // Return stakes to both sides (inline balance mutations)
+                var creator = users[bet.CreatorId];
+                creator.ReservedBalance -= bet.Amount;
+                creator.VirtualBalance += bet.Amount;
+
+                var coverer = users[bet.CoveredById!.Value];
+                coverer.ReservedBalance -= bet.Amount;
+                coverer.VirtualBalance += bet.Amount;
 
                 bet.Status = BetStatus.Voided;
                 bet.Result = BetResult.Voided;
@@ -48,16 +66,20 @@ public class SettlementService : ISettlementService
                 Guid winnerId = creatorWins ? bet.CreatorId : bet.CoveredById!.Value;
                 Guid loserId = creatorWins ? bet.CoveredById!.Value : bet.CreatorId;
 
-                // Credit winner: VirtualBalance += 2*amount, ReservedBalance -= amount
-                await _balanceService.CreditWinnerAsync(winnerId, bet.Amount);
-                // Deduct loser's reserved stake (consumed by winner's credit)
-                await DeductReservedAsync(loserId, bet.Amount);
+                // Credit winner: VirtualBalance += 2*amount, ReservedBalance -= amount (inline)
+                var winner = users[winnerId];
+                winner.VirtualBalance += 2 * bet.Amount;
+                winner.ReservedBalance -= bet.Amount;
+
+                // Deduct loser's reserved stake (inline)
+                var loser = users[loserId];
+                if (loser.ReservedBalance < bet.Amount)
+                    throw new InvalidOperationException("INSUFFICIENT_RESERVED_BALANCE");
+                loser.ReservedBalance -= bet.Amount;
 
                 // Update win/loss counters
-                var winner = await _db.Users.FindAsync(winnerId);
-                var loser = await _db.Users.FindAsync(loserId);
-                if (winner != null) winner.WinsCount++;
-                if (loser != null) loser.LossesCount++;
+                winner.WinsCount++;
+                loser.LossesCount++;
 
                 bet.Result = creatorWins ? BetResult.CreatorWon : BetResult.CovererWon;
                 bet.Status = BetStatus.Settled;
@@ -66,6 +88,7 @@ public class SettlementService : ISettlementService
         }
 
         await _db.SaveChangesAsync();
+        await tx.CommitAsync();
     }
 
     /// <summary>
@@ -76,6 +99,10 @@ public class SettlementService : ISettlementService
     {
         var user = await _db.Users.FindAsync(userId)
             ?? throw new KeyNotFoundException($"User {userId} not found.");
+
+        if (user.ReservedBalance < amount)
+            throw new InvalidOperationException("INSUFFICIENT_RESERVED_BALANCE");
+
         user.ReservedBalance -= amount;
         // SaveChanges is called by the caller after all bets are processed
     }

@@ -25,18 +25,34 @@ builder.Services.AddCors(options =>
               .AllowAnyMethod()
               .AllowAnyHeader()));
 
-// Rate limiting — proteção contra brute force nos endpoints de auth
-builder.Services.AddRateLimiter(options =>
+// Rate limiting — proteção contra brute force nos endpoints de auth (desabilitado em Testing)
+if (!builder.Environment.IsEnvironment("Testing"))
 {
-    options.AddFixedWindowLimiter("auth", o =>
+    builder.Services.AddRateLimiter(options =>
     {
-        o.PermitLimit = 5;
-        o.Window = TimeSpan.FromMinutes(15);
-        o.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        o.QueueLimit = 0;
+        options.AddFixedWindowLimiter("auth", o =>
+        {
+            o.PermitLimit = 5;
+            o.Window = TimeSpan.FromMinutes(15);
+            o.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+            o.QueueLimit = 0;
+        });
+        options.RejectionStatusCode = 429;
     });
-    options.RejectionStatusCode = 429;
-});
+}
+else
+{
+    // Registra o rate limiter sem limites para que o middleware funcione nos testes
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.AddFixedWindowLimiter("auth", o =>
+        {
+            o.PermitLimit = int.MaxValue;
+            o.Window = TimeSpan.FromSeconds(1);
+            o.QueueLimit = 0;
+        });
+    });
+}
 
 // EF Core + PostgreSQL
 builder.Services.AddDbContext<FrogBetsDbContext>(options =>
@@ -115,11 +131,12 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-// Auto-apply EF Core migrations on startup
+// Auto-apply EF Core migrations on startup (skip for InMemory used in tests)
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<FrogBetsDbContext>();
-    db.Database.Migrate();
+    if (db.Database.IsRelational())
+        db.Database.Migrate();
 }
 
 app.UseCors("Frontend");

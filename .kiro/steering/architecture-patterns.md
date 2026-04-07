@@ -113,6 +113,18 @@ public Property NomeDaPropriedade()
 
 Cada spec deve ter seus property-tests cobrindo todas as propriedades de corretude definidas no `design.md`.
 
+## Regras de Qualidade — Obrigatórias
+
+**Nunca fazer commit sem antes rodar e garantir que todos os testes passam.**
+
+```powershell
+# Antes de qualquer commit, rodar:
+dotnet test --configuration Release --verbosity quiet
+cd frontend && npm run test -- --run
+```
+
+Todos os 245 testes .NET devem passar. Zero falhas é o único estado aceitável para commit.
+
 ## Deploy e Infraestrutura
 
 ### Docker

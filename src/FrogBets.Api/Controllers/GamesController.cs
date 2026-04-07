@@ -106,6 +106,10 @@ public class GamesController : ControllerBase
                 }
             });
         }
+        catch (InvalidOperationException ex) when (ex.Message == "INVALID_WINNING_OPTION")
+        {
+            return BadRequest(new { error = new { code = ex.Message, message = "Opção vencedora inválida para este tipo de mercado." } });
+        }
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────

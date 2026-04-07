@@ -124,6 +124,9 @@ public class GameService : IGameService
         var market = game.Markets.FirstOrDefault(m => m.Id == request.MarketId)
             ?? throw new KeyNotFoundException($"Market {request.MarketId} not found in game {gameId}.");
 
+        // Validate winning option based on market type
+        await ValidateOptionAsync(market.Type, request.WinningOption);
+
         // Record the result
         var result = new GameResult
         {
@@ -153,6 +156,25 @@ public class GameService : IGameService
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
+
+    private async Task ValidateOptionAsync(MarketType marketType, string option)
+    {
+        if (string.IsNullOrWhiteSpace(option))
+            throw new InvalidOperationException("INVALID_WINNING_OPTION");
+
+        if (marketType is MarketType.MapWinner or MarketType.SeriesWinner)
+        {
+            if (option != "TeamA" && option != "TeamB")
+                throw new InvalidOperationException("INVALID_WINNING_OPTION");
+        }
+        else
+        {
+            // For player-based markets, validate against known player nicknames
+            var playerExists = await _db.CS2Players.AnyAsync(p => p.Nickname == option);
+            if (!playerExists)
+                throw new InvalidOperationException("INVALID_WINNING_OPTION");
+        }
+    }
 
     private static GameDto ToDto(Game g) => new(
         g.Id,

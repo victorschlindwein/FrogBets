@@ -33,6 +33,9 @@ public class BetService : IBetService
         if (market.Game.Status != GameStatus.Scheduled)
             throw new InvalidOperationException("GAME_ALREADY_STARTED");
 
+        // Validate creator option based on market type
+        await ValidateOptionAsync(market.Type, creatorOption);
+
         // Validate no duplicate bet by same user on same market
         var hasDuplicate = await _db.Bets.AnyAsync(b =>
             b.MarketId == marketId &&
@@ -132,6 +135,25 @@ public class BetService : IBetService
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
+
+    private async Task ValidateOptionAsync(MarketType marketType, string option)
+    {
+        if (string.IsNullOrWhiteSpace(option))
+            throw new InvalidOperationException("INVALID_BET_OPTION");
+
+        if (marketType is MarketType.MapWinner or MarketType.SeriesWinner)
+        {
+            if (option != "TeamA" && option != "TeamB")
+                throw new InvalidOperationException("INVALID_BET_OPTION");
+        }
+        else
+        {
+            // For player-based markets, validate against known player nicknames
+            var playerExists = await _db.CS2Players.AnyAsync(p => p.Nickname == option);
+            if (!playerExists)
+                throw new InvalidOperationException("INVALID_BET_OPTION");
+        }
+    }
 
     private static string GetOppositeOption(MarketType marketType, string creatorOption)
     {

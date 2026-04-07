@@ -189,10 +189,219 @@ jobs:
             --policy-document "$GITHUB_POLICY" > /dev/null
 
           GITHUB_ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/${APP_NAME}-github-actions"
-          echo ""
+          echo "GITHUB_ROLE_ARN=$GITHUB_ROLE_ARN" >> $GITHUB_ENV
+
+      # 9. ALB
+      - name: Create ALB
+        run: |
+          SUBNET_IDS=$(aws ec2 describe-subnets \
+            --filters "Name=vpc-id,Values=$VPC_ID" \
+            --query "Subnets[*].SubnetId" --output text --region $AWS_REGION)
+
+          ALB_SG=$(aws ec2 describe-security-groups \
+            --filters "Name=group-name,Values=${APP_NAME}-alb-sg" \
+            --query "SecurityGroups[0].GroupId" --output text --region $AWS_REGION)
+
+          ALB_ARN=$(aws elbv2 describe-load-balancers \
+            --names "${APP_NAME}-alb" \
+            --query "LoadBalancers[0].LoadBalancerArn" --output text --region $AWS_REGION 2>/dev/null || echo "")
+
+          if [ -z "$ALB_ARN" ] || [ "$ALB_ARN" = "None" ]; then
+            ALB_ARN=$(aws elbv2 create-load-balancer \
+              --name "${APP_NAME}-alb" \
+              --subnets $SUBNET_IDS \
+              --security-groups $ALB_SG \
+              --scheme internet-facing \
+              --type application \
+              --region $AWS_REGION \
+              --query "LoadBalancers[0].LoadBalancerArn" --output text)
+          fi
+
+          ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --load-balancer-arns "$ALB_ARN" \
+            --query "LoadBalancers[0].DNSName" --output text --region $AWS_REGION)
+
+          echo "ALB_ARN=$ALB_ARN" >> $GITHUB_ENV
+          echo "ALB_DNS=$ALB_DNS" >> $GITHUB_ENV
+          echo "ALB DNS: $ALB_DNS"
+
+      # 10. Target Groups
+      - name: Create Target Groups
+        run: |
+          API_TG_ARN=$(aws elbv2 describe-target-groups \
+            --names "${APP_NAME}-api-tg" \
+            --query "TargetGroups[0].TargetGroupArn" --output text --region $AWS_REGION 2>/dev/null || echo "")
+
+          if [ -z "$API_TG_ARN" ] || [ "$API_TG_ARN" = "None" ]; then
+            API_TG_ARN=$(aws elbv2 create-target-group \
+              --name "${APP_NAME}-api-tg" \
+              --protocol HTTP --port 8080 \
+              --vpc-id $VPC_ID --target-type ip \
+              --health-check-path "/api/health" \
+              --health-check-interval-seconds 30 \
+              --healthy-threshold-count 2 \
+              --unhealthy-threshold-count 3 \
+              --region $AWS_REGION \
+              --query "TargetGroups[0].TargetGroupArn" --output text)
+          fi
+
+          FRONTEND_TG_ARN=$(aws elbv2 describe-target-groups \
+            --names "${APP_NAME}-frontend-tg" \
+            --query "TargetGroups[0].TargetGroupArn" --output text --region $AWS_REGION 2>/dev/null || echo "")
+
+          if [ -z "$FRONTEND_TG_ARN" ] || [ "$FRONTEND_TG_ARN" = "None" ]; then
+            FRONTEND_TG_ARN=$(aws elbv2 create-target-group \
+              --name "${APP_NAME}-frontend-tg" \
+              --protocol HTTP --port 80 \
+              --vpc-id $VPC_ID --target-type ip \
+              --health-check-path "/" \
+              --health-check-interval-seconds 30 \
+              --healthy-threshold-count 2 \
+              --unhealthy-threshold-count 3 \
+              --region $AWS_REGION \
+              --query "TargetGroups[0].TargetGroupArn" --output text)
+          fi
+
+          echo "API_TG_ARN=$API_TG_ARN" >> $GITHUB_ENV
+          echo "FRONTEND_TG_ARN=$FRONTEND_TG_ARN" >> $GITHUB_ENV
+
+      # 11. Listener
+      - name: Create Listener
+        run: |
+          LISTENER_ARN=$(aws elbv2 describe-listeners \
+            --load-balancer-arn "$ALB_ARN" \
+            --query "Listeners[0].ListenerArn" --output text --region $AWS_REGION 2>/dev/null || echo "")
+
+          if [ -z "$LISTENER_ARN" ] || [ "$LISTENER_ARN" = "None" ]; then
+            LISTENER_ARN=$(aws elbv2 create-listener \
+              --load-balancer-arn "$ALB_ARN" \
+              --protocol HTTP --port 80 \
+              --default-actions "Type=forward,TargetGroupArn=$FRONTEND_TG_ARN" \
+              --region $AWS_REGION \
+              --query "Listeners[0].ListenerArn" --output text)
+          fi
+
+          aws elbv2 create-rule \
+            --listener-arn "$LISTENER_ARN" \
+            --priority 10 \
+            --conditions "Field=path-pattern,Values=/api/*" \
+            --actions "Type=forward,TargetGroupArn=$API_TG_ARN" \
+            --region $AWS_REGION > /dev/null 2>/dev/null || true
+
+      # 12. Task Definitions + ECS Services
+      - name: Register Task Definitions and Create ECS Services
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          ECR_REGISTRY="$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+          EXECUTION_ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/${APP_NAME}-ecs-execution-role"
+
+          ECS_SG=$(aws ec2 describe-security-groups \
+            --filters "Name=group-name,Values=${APP_NAME}-ecs-sg" \
+            --query "SecurityGroups[0].GroupId" --output text --region $AWS_REGION)
+
+          SUBNET_IDS=$(aws ec2 describe-subnets \
+            --filters "Name=vpc-id,Values=$VPC_ID" \
+            --query "Subnets[*].SubnetId" --output text --region $AWS_REGION)
+          SUBNET_CSV=$(echo $SUBNET_IDS | tr ' ' ',')
+
+          cat > /tmp/ecs-task-api.json << EOF
+          {
+            "family": "frogbets-api",
+            "networkMode": "awsvpc",
+            "requiresCompatibilities": ["FARGATE"],
+            "cpu": "512", "memory": "1024",
+            "executionRoleArn": "$EXECUTION_ROLE_ARN",
+            "containerDefinitions": [{
+              "name": "frogbets-api",
+              "image": "$ECR_REGISTRY/frogbets-api:latest",
+              "portMappings": [{"containerPort": 8080, "protocol": "tcp"}],
+              "environment": [
+                {"name": "ASPNETCORE_ENVIRONMENT", "value": "Production"},
+                {"name": "Jwt__Issuer", "value": "FrogBets"},
+                {"name": "Jwt__Audience", "value": "FrogBets"},
+                {"name": "Jwt__ExpirationMinutes", "value": "60"}
+              ],
+              "secrets": [
+                {"name": "ConnectionStrings__DefaultConnection", "valueFrom": "arn:aws:ssm:$AWS_REGION:$ACCOUNT_ID:parameter/frogbets/db-connection-string"},
+                {"name": "Jwt__Key", "valueFrom": "arn:aws:ssm:$AWS_REGION:$ACCOUNT_ID:parameter/frogbets/jwt-key"}
+              ],
+              "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                  "awslogs-group": "/ecs/frogbets-api",
+                  "awslogs-region": "$AWS_REGION",
+                  "awslogs-stream-prefix": "ecs",
+                  "awslogs-create-group": "true"
+                }
+              },
+              "essential": true
+            }]
+          }
+          EOF
+
+          cat > /tmp/ecs-task-frontend.json << EOF
+          {
+            "family": "frogbets-frontend",
+            "networkMode": "awsvpc",
+            "requiresCompatibilities": ["FARGATE"],
+            "cpu": "256", "memory": "512",
+            "executionRoleArn": "$EXECUTION_ROLE_ARN",
+            "containerDefinitions": [{
+              "name": "frogbets-frontend",
+              "image": "$ECR_REGISTRY/frogbets-frontend:latest",
+              "portMappings": [{"containerPort": 80, "protocol": "tcp"}],
+              "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                  "awslogs-group": "/ecs/frogbets-frontend",
+                  "awslogs-region": "$AWS_REGION",
+                  "awslogs-stream-prefix": "ecs",
+                  "awslogs-create-group": "true"
+                }
+              },
+              "essential": true
+            }]
+          }
+          EOF
+
+          aws ecs register-task-definition --cli-input-json file:///tmp/ecs-task-api.json --region $AWS_REGION > /dev/null
+          aws ecs register-task-definition --cli-input-json file:///tmp/ecs-task-frontend.json --region $AWS_REGION > /dev/null
+
+          API_EXISTS=$(aws ecs describe-services --cluster $APP_NAME --services "${APP_NAME}-api" \
+            --query "services[?status=='ACTIVE'].serviceName" --output text --region $AWS_REGION 2>/dev/null || echo "")
+          if [ -z "$API_EXISTS" ]; then
+            aws ecs create-service \
+              --cluster $APP_NAME --service-name "${APP_NAME}-api" \
+              --task-definition "${APP_NAME}-api" --desired-count 1 \
+              --launch-type FARGATE \
+              --network-configuration "awsvpcConfiguration={subnets=[$SUBNET_CSV],securityGroups=[$ECS_SG],assignPublicIp=ENABLED}" \
+              --load-balancers "targetGroupArn=$API_TG_ARN,containerName=frogbets-api,containerPort=8080" \
+              --region $AWS_REGION > /dev/null
+          fi
+
+          FRONTEND_EXISTS=$(aws ecs describe-services --cluster $APP_NAME --services "${APP_NAME}-frontend" \
+            --query "services[?status=='ACTIVE'].serviceName" --output text --region $AWS_REGION 2>/dev/null || echo "")
+          if [ -z "$FRONTEND_EXISTS" ]; then
+            aws ecs create-service \
+              --cluster $APP_NAME --service-name "${APP_NAME}-frontend" \
+              --task-definition "${APP_NAME}-frontend" --desired-count 1 \
+              --launch-type FARGATE \
+              --network-configuration "awsvpcConfiguration={subnets=[$SUBNET_CSV],securityGroups=[$ECS_SG],assignPublicIp=ENABLED}" \
+              --load-balancers "targetGroupArn=$FRONTEND_TG_ARN,containerName=frogbets-frontend,containerPort=80" \
+              --region $AWS_REGION > /dev/null
+          fi
+
+          aws ssm put-parameter --name "/frogbets/api-url" \
+            --value "http://$ALB_DNS" --type String --overwrite --region $AWS_REGION > /dev/null
+
+      - name: Done
+        run: |
           echo "======================================================"
           echo "BOOTSTRAP COMPLETE"
+          echo "App URL: http://$ALB_DNS"
+          echo ""
           echo "Add this secret to GitHub (Settings > Secrets > Actions):"
           echo "  AWS_ROLE_ARN = $GITHUB_ROLE_ARN"
+          echo ""
           echo "Then delete BOOTSTRAP_AWS_ACCESS_KEY_ID and BOOTSTRAP_AWS_SECRET_ACCESS_KEY"
           echo "======================================================"

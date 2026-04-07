@@ -3,6 +3,7 @@ using FrogBets.Domain.Entities;
 using FrogBets.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FrogBets.Tests;
 
@@ -33,9 +34,20 @@ public class AuthServiceTests
         return new ConfigurationBuilder().AddInMemoryCollection(dict).Build();
     }
 
+    private static TokenBlocklist CreateBlocklist(FrogBetsDbContext db)
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(db);
+        services.AddDbContext<FrogBetsDbContext>(o =>
+            o.UseInMemoryDatabase(Guid.NewGuid().ToString()));
+        var provider = services.BuildServiceProvider();
+        var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
+        return new TokenBlocklist(scopeFactory);
+    }
+
     private static AuthService CreateService(FrogBetsDbContext db, IConfiguration? config = null)
     {
-        var blocklist = new TokenBlocklist();
+        var blocklist = CreateBlocklist(db);
         return new AuthService(db, config ?? CreateConfig(), blocklist);
     }
 
@@ -140,7 +152,7 @@ public class AuthServiceTests
     {
         await using var db = CreateDb();
         await SeedUserAsync(db);
-        var blocklist = new TokenBlocklist();
+        var blocklist = CreateBlocklist(db);
         var svc = new AuthService(db, CreateConfig(), blocklist);
 
         var result = await svc.LoginAsync("testuser", "password123");

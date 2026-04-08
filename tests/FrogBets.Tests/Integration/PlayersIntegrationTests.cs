@@ -39,10 +39,22 @@ public class PlayersIntegrationTests : IClassFixture<IntegrationTestFactory>
     // ── GET /api/players/ranking ──────────────────────────────────────────────
 
     [Fact]
-    public async Task GetRanking_Anonymous_Returns200()
+    public async Task GetRanking_Authenticated_Returns200()
     {
+        using var db = _factory.CreateDbContext();
+        var user = await IntegrationTestFactory.SeedUserAsync(db, "user_ranking");
+        AuthAs(user.Id, user.Username);
+
         var res = await _client.GetAsync("/api/players/ranking");
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetRanking_Anonymous_Returns401()
+    {
+        _client.DefaultRequestHeaders.Authorization = null;
+        var res = await _client.GetAsync("/api/players/ranking");
+        Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
     }
 
     // ── GET /api/players ──────────────────────────────────────────────────────

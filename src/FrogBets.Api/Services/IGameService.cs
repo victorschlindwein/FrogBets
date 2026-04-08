@@ -4,6 +4,12 @@ public record CreateGameRequest(string TeamA, string TeamB, DateTime ScheduledAt
 
 public record RegisterResultRequest(Guid MarketId, string WinningOption, int? MapNumber);
 
+public record UpdateGameRequest(
+    string? TeamA,
+    string? TeamB,
+    DateTime? ScheduledAt,
+    int? NumberOfMaps);
+
 public interface IGameService
 {
     /// <summary>
@@ -32,6 +38,20 @@ public interface IGameService
     /// If all markets are Settled/Voided, sets game Status = Finished.
     /// </summary>
     Task RegisterResultAsync(Guid gameId, RegisterResultRequest request, Guid adminId);
+
+    /// <summary>
+    /// Atualiza campos de um jogo Scheduled. Regenera mercados se NumberOfMaps mudar.
+    /// Throws KeyNotFoundException se o jogo não existir.
+    /// Throws InvalidOperationException("GAME_CANNOT_BE_EDITED") se status != Scheduled.
+    /// </summary>
+    Task<GameDto> UpdateGameAsync(Guid gameId, UpdateGameRequest request);
+
+    /// <summary>
+    /// Exclui um jogo Scheduled, cancelando apostas e devolvendo saldo.
+    /// Throws KeyNotFoundException se o jogo não existir.
+    /// Throws InvalidOperationException("GAME_CANNOT_BE_DELETED") se status == InProgress ou Finished.
+    /// </summary>
+    Task DeleteGameAsync(Guid gameId);
 }
 
 public record GameDto(

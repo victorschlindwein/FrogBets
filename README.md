@@ -89,6 +89,8 @@ AWS ALB (porta 80/443)
 - Ao criar um jogo com N mapas, o sistema gera automaticamente:
   - N × {Vencedor do Mapa, Top Kills, Mais Mortes, Maior Dano por Utilitários}
   - 1 × Vencedor da Série
+- Admins podem editar jogos agendados (times, data, número de mapas) — ao alterar o número de mapas, os mercados são regenerados automaticamente
+- Admins podem excluir jogos agendados — todas as apostas pendentes e ativas são canceladas e os saldos devolvidos; jogos em andamento ou finalizados não podem ser excluídos
 - Admin inicia o jogo (mercados fecham para novas apostas) e registra resultados por mercado
 - Ao registrar um resultado, todas as apostas ativas são liquidadas: vencedor recebe 2× o valor, perdedor perde o reservado
 
@@ -109,12 +111,14 @@ AWS ALB (porta 80/443)
 
 ### Acesso e Segurança
 - Plataforma fechada por convite — único caminho para criar conta é via token gerado por admin
+- Todas as rotas da API exigem autenticação JWT (exceto login, registro e health check)
 - JWT com expiração de 60 minutos e logout real (token adicionado à blocklist)
 - Rate limiting nos endpoints de autenticação (5 tentativas por 15 minutos por IP)
 - Auditoria automática de todas as operações de escrita
 
 ### Painel Administrativo
 - Interface web completa para gerenciar jogos, times, jogadores, convites, resultados e estatísticas
+- Edição e exclusão de jogos agendados diretamente pelo painel
 - Dropdowns com dados reais (sem necessidade de copiar/colar UUIDs)
 - Gestão de líderes de time e trocas diretas entre membros
 

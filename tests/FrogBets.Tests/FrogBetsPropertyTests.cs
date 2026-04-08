@@ -550,7 +550,7 @@ public class FrogBetsPropertyTests
     public async Task RegisterResult_FinishedGame_IsRejected()
     {
         await using var db = CreateDb();
-        var svc = new GameService(db, CreateSettlementService(db));
+        var svc = new GameService(db, CreateSettlementService(db), new BalanceService(db));
         var gameId = await svc.CreateGameAsync(new CreateGameRequest("TeamA", "TeamB", DateTime.UtcNow.AddDays(1), 1));
         await svc.StartGameAsync(gameId);
 

@@ -27,16 +27,31 @@ public class GamesIntegrationTests : IClassFixture<IntegrationTestFactory>
     // ── GET /api/games ────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task GetGames_Anonymous_Returns200()
+    public async Task GetGames_Authenticated_Returns200()
     {
+        using var db = _factory.CreateDbContext();
+        var user = await IntegrationTestFactory.SeedUserAsync(db, "user_getgames");
+        AuthAs(user.Id, user.Username);
+
         var res = await _client.GetAsync("/api/games");
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetGames_Anonymous_Returns401()
+    {
+        _client.DefaultRequestHeaders.Authorization = null;
+        var res = await _client.GetAsync("/api/games");
+        Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
     }
 
     [Fact]
     public async Task GetGames_ReturnsSeededGames()
     {
         using var db = _factory.CreateDbContext();
+        var user = await IntegrationTestFactory.SeedUserAsync(db, "user_seeded_games");
+        AuthAs(user.Id, user.Username);
+
         var game = new Game
         {
             Id           = Guid.NewGuid(),
@@ -63,6 +78,9 @@ public class GamesIntegrationTests : IClassFixture<IntegrationTestFactory>
     public async Task GetGameById_ExistingGame_Returns200WithMarkets()
     {
         using var db = _factory.CreateDbContext();
+        var user = await IntegrationTestFactory.SeedUserAsync(db, "user_getgame_byid");
+        AuthAs(user.Id, user.Username);
+
         var game = new Game
         {
             Id           = Guid.NewGuid(),
@@ -95,8 +113,20 @@ public class GamesIntegrationTests : IClassFixture<IntegrationTestFactory>
     [Fact]
     public async Task GetGameById_NonExistent_Returns404()
     {
+        using var db = _factory.CreateDbContext();
+        var user = await IntegrationTestFactory.SeedUserAsync(db, "user_getgame_404");
+        AuthAs(user.Id, user.Username);
+
         var res = await _client.GetAsync($"/api/games/{Guid.NewGuid()}");
         Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetGameById_Anonymous_Returns401()
+    {
+        _client.DefaultRequestHeaders.Authorization = null;
+        var res = await _client.GetAsync($"/api/games/{Guid.NewGuid()}");
+        Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
     }
 
     // ── POST /api/games ───────────────────────────────────────────────────────

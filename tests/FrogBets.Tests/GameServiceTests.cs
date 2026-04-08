@@ -34,8 +34,15 @@ public class GameServiceTests
             => Task.CompletedTask;
     }
 
+    private sealed class NoOpBalanceService : IBalanceService
+    {
+        public Task ReserveBalanceAsync(Guid userId, decimal amount) => Task.CompletedTask;
+        public Task ReleaseBalanceAsync(Guid userId, decimal amount) => Task.CompletedTask;
+        public Task CreditWinnerAsync(Guid winnerId, decimal amount) => Task.CompletedTask;
+    }
+
     private static GameService CreateGameService(FrogBetsDbContext db)
-        => new(db, new NoOpSettlementService());
+        => new(db, new NoOpSettlementService(), new NoOpBalanceService());
 
     // ── CreateGame ────────────────────────────────────────────────────────────
 

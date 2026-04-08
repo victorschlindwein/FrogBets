@@ -29,6 +29,8 @@ function playerLabel(p: CS2Player): string {
 const NAV_ITEMS_BASE = [
   { id: 'sec-users',       label: '👥 Usuários' },
   { id: 'sec-games',       label: '🎮 Cadastrar Jogo' },
+  { id: 'sec-edit-game',   label: '✏️ Editar Jogo' },
+  { id: 'sec-delete-game', label: '🗑️ Excluir Jogo' },
   { id: 'sec-start',       label: '▶️ Iniciar Jogo' },
   { id: 'sec-result',      label: '🏁 Registrar Resultado' },
   { id: 'sec-invites',     label: '🎟️ Convites' },
@@ -1100,6 +1102,162 @@ function LeaderManagementSection({ teams, users }: { teams: CS2Team[]; users: Us
   )
 }
 
+// ── Excluir Jogo ──────────────────────────────────────────────────────────
+function DeleteGameSection({ games, onDeleted }: { games: Game[]; onDeleted: () => void }) {
+  const [error, setError] = useState<string | null>(null)
+  const scheduledGames = games.filter(g => g.status === 'Scheduled')
+
+  async function handleDelete(game: Game) {
+    if (!confirm(`Excluir o jogo "${game.teamA} vs ${game.teamB}" agendado para ${new Date(game.scheduledAt).toLocaleString('pt-BR')}? Esta ação não pode ser desfeita e todas as apostas serão canceladas.`)) return
+    setError(null)
+    try {
+      await apiClient.delete(`/games/${game.id}`)
+      onDeleted()
+    } catch (err: unknown) {
+      const e2 = err as { response?: { data?: { error?: { message?: string } } } }
+      setError(e2.response?.data?.error?.message ?? 'Erro ao excluir jogo.')
+    }
+  }
+
+  return (
+    <section id="sec-delete-game">
+      <h2>🗑️ Excluir Jogo</h2>
+      {scheduledGames.length === 0 ? (
+        <div className="card empty-card"><p>Nenhum jogo agendado para excluir.</p></div>
+      ) : (
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="table-wrapper">
+            <table>
+              <thead>
+                <tr><th>Jogo</th><th>Data</th><th>Mapas</th><th>Ação</th></tr>
+              </thead>
+              <tbody>
+                {scheduledGames.map(g => (
+                  <tr key={g.id}>
+                    <td>{g.teamA} vs {g.teamB}</td>
+                    <td>{new Date(g.scheduledAt).toLocaleString('pt-BR')}</td>
+                    <td>{g.numberOfMaps}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn-danger"
+                        onClick={() => handleDelete(g)}
+                        style={{ padding: '.3rem .7rem', fontSize: '.8rem' }}
+                      >
+                        Excluir
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {error && <p role="alert" style={{ padding: '1rem' }}>{error}</p>}
+        </div>
+      )}
+    </section>
+  )
+}
+
+// ── Editar Jogo ───────────────────────────────────────────────────────────
+function EditGameSection({ games, onUpdated }: { games: Game[]; onUpdated: () => void }) {
+  const [selectedGameId, setSelectedGameId] = useState('')
+  const [teamA, setTeamA] = useState('')
+  const [teamB, setTeamB] = useState('')
+  const [scheduledAt, setScheduledAt] = useState('')
+  const [numberOfMaps, setNumberOfMaps] = useState('1')
+  const [submitting, setSubmitting] = useState(false)
+  const [success, setSuccess] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const scheduledGames = games.filter(g => g.status === 'Scheduled')
+
+  function toDatetimeLocal(iso: string): string {
+    const d = new Date(iso)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }
+
+  function handleSelectGame(id: string) {
+    setSelectedGameId(id)
+    setSuccess(null); setError(null)
+    const game = scheduledGames.find(g => g.id === id)
+    if (game) {
+      setTeamA(game.teamA)
+      setTeamB(game.teamB)
+      setScheduledAt(toDatetimeLocal(game.scheduledAt))
+      setNumberOfMaps(String(game.numberOfMaps))
+    } else {
+      setTeamA(''); setTeamB(''); setScheduledAt(''); setNumberOfMaps('1')
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selectedGameId) return
+    setSubmitting(true); setSuccess(null); setError(null)
+    try {
+      await apiClient.patch(`/games/${selectedGameId}`, {
+        teamA,
+        teamB,
+        scheduledAt: new Date(scheduledAt).toISOString(),
+        numberOfMaps: parseInt(numberOfMaps, 10),
+      })
+      setSuccess('Jogo atualizado com sucesso!')
+      onUpdated()
+    } catch (err: unknown) {
+      const e2 = err as { response?: { data?: { error?: { message?: string } } } }
+      setError(e2.response?.data?.error?.message ?? 'Erro ao atualizar jogo.')
+    } finally { setSubmitting(false) }
+  }
+
+  return (
+    <section id="sec-edit-game">
+      <h2>✏️ Editar Jogo</h2>
+      {scheduledGames.length === 0 ? (
+        <div className="card empty-card"><p>Nenhum jogo agendado disponível para editar.</p></div>
+      ) : (
+        <div className="card">
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label htmlFor="editGameSelect">Selecionar Jogo:</label>
+              <select id="editGameSelect" value={selectedGameId} onChange={e => handleSelectGame(e.target.value)} required>
+                <option value="">Selecione um jogo</option>
+                {scheduledGames.map(g => (
+                  <option key={g.id} value={g.id}>{g.teamA} vs {g.teamB} — {new Date(g.scheduledAt).toLocaleString('pt-BR')}</option>
+                ))}
+              </select>
+            </div>
+            {selectedGameId && (
+              <>
+                <div className="form-group">
+                  <label htmlFor="editTeamA">Time A:</label>
+                  <input id="editTeamA" type="text" value={teamA} onChange={e => setTeamA(e.target.value)} required />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="editTeamB">Time B:</label>
+                  <input id="editTeamB" type="text" value={teamB} onChange={e => setTeamB(e.target.value)} required />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="editScheduledAt">Data e Hora:</label>
+                  <input id="editScheduledAt" type="datetime-local" value={scheduledAt} onChange={e => setScheduledAt(e.target.value)} required />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="editNumberOfMaps">Número de Mapas:</label>
+                  <input id="editNumberOfMaps" type="number" min="1" max="5" value={numberOfMaps} onChange={e => setNumberOfMaps(e.target.value)} required />
+                </div>
+                <button type="submit" disabled={submitting}>{submitting ? 'Salvando...' : 'Salvar alterações'}</button>
+              </>
+            )}
+            {success && <p role="status">{success}</p>}
+            {error && <p role="alert">{error}</p>}
+          </form>
+        </div>
+      )}
+    </section>
+  )
+}
+
 // ── Troca Direta ──────────────────────────────────────────────────────────
 function DirectSwapSection({ users, teams }: { users: User[]; teams: CS2Team[] }) {
   const [teamAId, setTeamAId] = useState('')
@@ -1218,6 +1376,8 @@ export default function AdminPage() {
       <UsersSection currentUser={user} teams={teams} />
       {isMasterAdmin && <AdminManagementSection users={users} currentUser={user} onUsersChange={loadUsers} />}
       <CreateGameForm teams={teams} onCreated={loadGames} />
+      <DeleteGameSection games={games} onDeleted={loadGames} />
+      <EditGameSection games={games} onUpdated={loadGames} />
       <StartGameSection games={games} onStarted={loadGames} />
       <RegisterResultSection games={games} />
       <InvitesSection />

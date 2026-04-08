@@ -180,11 +180,21 @@ Onde: KPR = kills/rounds, DPR = deaths/rounds, ADR = damage/rounds, Impact = KPR
 ### Jogos
 | Método | Rota | Auth | Descrição |
 |---|---|---|---|
-| GET | `/api/games` | Público | Listar todos os jogos |
-| GET | `/api/games/{id}` | Público | Detalhes de um jogo específico |
+| GET | `/api/games` | JWT | Listar todos os jogos |
+| GET | `/api/games/{id}` | JWT | Detalhes de um jogo específico |
 | POST | `/api/games` | Admin | Criar jogo (gera mercados automaticamente) |
+| PATCH | `/api/games/{id}` | Admin | Editar jogo agendado (times, data, número de mapas); regenera mercados se `NumberOfMaps` mudar |
+| DELETE | `/api/games/{id}` | Admin | Excluir jogo agendado; cancela apostas e devolve saldo; bloqueado se `InProgress` ou `Finished` |
 | PATCH | `/api/games/{id}/start` | Admin | Iniciar jogo (fecha mercados) |
 | POST | `/api/games/{id}/results` | Admin | Registrar resultado de mercado |
+
+**Códigos de erro — Jogos:**
+| Código | HTTP | Descrição |
+|---|---|---|
+| `GAME_NOT_FOUND` | 404 | Jogo não encontrado |
+| `GAME_CANNOT_BE_EDITED` | 409 | Jogo não está com status `Scheduled` |
+| `GAME_CANNOT_BE_DELETED` | 409 | Jogo está `InProgress` ou `Finished` |
+| `GAME_ALREADY_FINISHED` | 409 | Jogo já finalizado (ao registrar resultado) |
 
 ### Apostas
 | Método | Rota | Auth | Descrição |
@@ -226,15 +236,15 @@ Onde: KPR = kills/rounds, DPR = deaths/rounds, ADR = damage/rounds, Impact = KPR
 ### Times e Jogadores
 | Método | Rota | Auth | Descrição |
 |---|---|---|---|
-| GET | `/api/teams` | Público | Listar times |
+| GET | `/api/teams` | JWT | Listar times |
 | POST | `/api/teams` | Admin | Criar time |
 | POST | `/api/teams/{id}/leader/{uid}` | Admin | Designar líder |
 | DELETE | `/api/teams/{id}/leader` | Admin | Remover líder |
 | POST | `/api/players` | Admin | Criar jogador |
 | GET | `/api/players` | Admin | Listar jogadores |
-| GET | `/api/players/ranking` | Público | Ranking de jogadores |
+| GET | `/api/players/ranking` | JWT | Ranking de jogadores |
 | POST | `/api/players/{id}/stats` | Admin | Registrar estatísticas de partida (body: `mapResultId`, kills, deaths, assists, totalDamage, kastPercent) |
-| GET | `/api/players/{id}/stats` | Público | Retornar estatísticas de um jogador por mapa |
+| GET | `/api/players/{id}/stats` | JWT | Retornar estatísticas de um jogador por mapa |
 
 ### MapResults
 | Método | Rota | Auth | Descrição |
@@ -355,7 +365,7 @@ Em produção, os valores são armazenados no AWS SSM Parameter Store e injetado
 dotnet test --configuration Release --verbosity quiet
 ```
 
-264 testes no total. Zero falhas é obrigatório antes de qualquer commit.
+287 testes no total. Zero falhas é obrigatório antes de qualquer commit.
 
 #### Arquivos de teste
 | Arquivo | Cobertura |

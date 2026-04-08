@@ -21,18 +21,18 @@ public class GamesController : ControllerBase
         _db = db;
     }
 
-    /// <summary>GET /api/games — public listing of all games.</summary>
+    /// <summary>GET /api/games — authenticated: listing of all games.</summary>
     [HttpGet]
-    [AllowAnonymous]
+    [Authorize]
     public async Task<IActionResult> GetGames()
     {
         var games = await _gameService.GetGamesAsync();
         return Ok(games);
     }
 
-    /// <summary>GET /api/games/{id} — public: get a single game with its markets.</summary>
+    /// <summary>GET /api/games/{id} — authenticated: get a single game with its markets.</summary>
     [HttpGet("{id:guid}")]
-    [AllowAnonymous]
+    [Authorize]
     public async Task<IActionResult> GetGame(Guid id)
     {
         var game = await _gameService.GetGameByIdAsync(id);
@@ -69,6 +69,50 @@ public class GamesController : ControllerBase
         catch (KeyNotFoundException ex)
         {
             return NotFound(new { error = new { code = "GAME_NOT_FOUND", message = ex.Message } });
+        }
+    }
+
+    /// <summary>PATCH /api/games/{id} — admin: edit a scheduled game.</summary>
+    [HttpPatch("{id:guid}")]
+    [Authorize]
+    public async Task<IActionResult> UpdateGame(Guid id, [FromBody] PatchGameBody body)
+    {
+        if (!await IsAdminFromDb()) return Forbid();
+
+        try
+        {
+            var result = await _gameService.UpdateGameAsync(id, new UpdateGameRequest(body.TeamA, body.TeamB, body.ScheduledAt, body.NumberOfMaps));
+            return Ok(result);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(new { error = new { code = "GAME_NOT_FOUND", message = "Jogo não encontrado." } });
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "GAME_CANNOT_BE_EDITED")
+        {
+            return Conflict(new { error = new { code = "GAME_CANNOT_BE_EDITED", message = "O jogo não pode ser editado pois não está agendado." } });
+        }
+    }
+
+    /// <summary>DELETE /api/games/{id} — admin: delete a scheduled game.</summary>
+    [HttpDelete("{id:guid}")]
+    [Authorize]
+    public async Task<IActionResult> DeleteGame(Guid id)
+    {
+        if (!await IsAdminFromDb()) return Forbid();
+
+        try
+        {
+            await _gameService.DeleteGameAsync(id);
+            return NoContent();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(new { error = new { code = "GAME_NOT_FOUND", message = "Jogo não encontrado." } });
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "GAME_CANNOT_BE_DELETED")
+        {
+            return Conflict(new { error = new { code = "GAME_CANNOT_BE_DELETED", message = "O jogo não pode ser excluído pois já está em andamento ou finalizado." } });
         }
     }
 
@@ -135,3 +179,9 @@ public record CreateGameBody(
     [Range(1, 5)] int NumberOfMaps
 );
 public record RegisterResultBody([Required] Guid MarketId, [Required][StringLength(200, MinimumLength = 1)] string WinningOption, int? MapNumber);
+public record PatchGameBody(
+    [StringLength(100, MinimumLength = 1)] string? TeamA,
+    [StringLength(100, MinimumLength = 1)] string? TeamB,
+    DateTime? ScheduledAt,
+    [Range(1, 5)] int? NumberOfMaps
+);

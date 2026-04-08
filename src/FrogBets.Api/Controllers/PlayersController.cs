@@ -33,9 +33,9 @@ public class PlayersController : ControllerBase
         return Ok(players);
     }
 
-    /// <summary>GET /api/players/ranking — public: player ranking.</summary>
+    /// <summary>GET /api/players/ranking — authenticated: player ranking.</summary>
     [HttpGet("ranking")]
-    [AllowAnonymous]
+    [Authorize]
     public async Task<IActionResult> GetRanking()
     {
         var ranking = await _playerService.GetRankingAsync();
@@ -80,9 +80,9 @@ public class PlayersController : ControllerBase
         }
     }
 
-    /// <summary>GET /api/players/{id}/stats — public: get stats for a player.</summary>
+    /// <summary>GET /api/players/{id}/stats — authenticated: get stats for a player.</summary>
     [HttpGet("{id:guid}/stats")]
-    [AllowAnonymous]
+    [Authorize]
     public async Task<IActionResult> GetStats(Guid id)
     {
         var stats = await _matchStatsService.GetStatsByPlayerAsync(id);

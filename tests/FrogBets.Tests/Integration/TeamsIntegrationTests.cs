@@ -25,10 +25,22 @@ public class TeamsIntegrationTests : IClassFixture<IntegrationTestFactory>
     // ── GET /api/teams ────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task GetTeams_Anonymous_Returns200()
+    public async Task GetTeams_Authenticated_Returns200()
     {
+        using var db = _factory.CreateDbContext();
+        var user = await IntegrationTestFactory.SeedUserAsync(db, "user_getteams");
+        AuthAs(user.Id, user.Username);
+
         var res = await _client.GetAsync("/api/teams");
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetTeams_Anonymous_Returns401()
+    {
+        _client.DefaultRequestHeaders.Authorization = null;
+        var res = await _client.GetAsync("/api/teams");
+        Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
     }
 
     // ── POST /api/teams ───────────────────────────────────────────────────────

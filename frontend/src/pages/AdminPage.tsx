@@ -1354,11 +1354,15 @@ export default function AdminPage() {
     apiClient.get<User[]>('/users').then(res => setUsers(res.data)).catch(() => {})
   }
 
+  function loadTeams() {
+    getTeams().then(data => setTeams(data)).catch(() => {})
+  }
+
   useEffect(() => {
     apiClient.get<User>('/users/me')
       .then(res => {
         if (!res.data.isAdmin) { setAccessDenied(true) }
-        else { setUser(res.data); loadGames(); loadUsers() }
+        else { setUser(res.data); loadGames(); loadUsers(); loadTeams() }
       })
       .catch(() => setAccessDenied(true))
       .finally(() => setLoading(false))

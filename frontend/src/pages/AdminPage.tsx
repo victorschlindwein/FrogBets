@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import apiClient from '../api/client'
 import { getTeams, createTeam, CS2Team, getPlayers, CS2Player, registerMatchStats, createMapResult, getMapResultsByGame, MapResult } from '../api/players'
 
-interface User { id: string; username: string; isAdmin: boolean; isMasterAdmin?: boolean }
+interface User { id: string; username: string; isAdmin: boolean; isMasterAdmin?: boolean; teamId?: string | null; isTeamLeader?: boolean }
 interface Invite {
   id: string; token: string; description: string | null
   expiresAt: string; createdAt: string; status: 'Pending' | 'Used' | 'Expired'
@@ -20,6 +20,9 @@ const MARKET_TYPE_LABELS: Record<string, string> = {
 function marketLabel(m: Market) {
   const t = MARKET_TYPE_LABELS[m.type] ?? m.type
   return m.mapNumber != null ? `${t} — Mapa ${m.mapNumber}` : t
+}
+function playerLabel(p: CS2Player): string {
+  return p.teamId ? `${p.nickname} - ${p.teamName}` : p.nickname
 }
 
 // ── Índice de navegação ───────────────────────────────────────────────────
@@ -58,7 +61,7 @@ function AdminNav({ isMasterAdmin }: { isMasterAdmin: boolean }) {
 }
 
 // ── Lista de Usuários ─────────────────────────────────────────────────────
-function UsersSection({ currentUser }: { currentUser: User }) {
+function UsersSection({ currentUser, teams }: { currentUser: User; teams: CS2Team[] }) {
   const [users, setUsers] = useState<User[]>([])
   const [copied, setCopied] = useState<string | null>(null)
 
@@ -74,6 +77,8 @@ function UsersSection({ currentUser }: { currentUser: User }) {
     })
   }
 
+  const teamNameById = Object.fromEntries(teams.map(t => [t.id, t.name]))
+
   return (
     <section id="sec-users">
       <h2>👥 Usuários</h2>
@@ -81,7 +86,7 @@ function UsersSection({ currentUser }: { currentUser: User }) {
         <div className="table-wrapper">
           <table>
             <thead>
-              <tr><th>Username</th><th>ID</th><th>Admin</th><th>Líder</th><th>Time ID</th></tr>
+              <tr><th>Username</th><th>ID</th><th>Admin</th><th>Líder</th><th>Time</th></tr>
             </thead>
             <tbody>
               {users.map(u => (
@@ -103,12 +108,8 @@ function UsersSection({ currentUser }: { currentUser: User }) {
                     </button>
                   </td>
                   <td>{u.isAdmin ? '✅' : '—'}</td>
-                  <td>{(u as unknown as { isTeamLeader: boolean }).isTeamLeader ? '✅' : '—'}</td>
-                  <td>
-                    {(u as unknown as { teamId: string | null }).teamId
-                      ? <code style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>{(u as unknown as { teamId: string }).teamId}</code>
-                      : '—'}
-                  </td>
+                  <td>{u.isTeamLeader ? '✅' : '—'}</td>
+                  <td>{u.teamId ? (teamNameById[u.teamId] ?? u.teamId) : '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -454,7 +455,7 @@ function RegisterResultSection({ games }: { games: Game[] }) {
 function InvitesSection() {
   const [invites, setInvites] = useState<Invite[]>([])
   const [quantity, setQuantity] = useState(1)
-  const [description, setDescription] = useState('')
+  const [descriptions, setDescriptions] = useState<string[]>([''])
   const [newTokens, setNewTokens] = useState<string[]>([])
   const [copiedToken, setCopiedToken] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -465,16 +466,29 @@ function InvitesSection() {
   }
   useEffect(() => { loadInvites() }, [])
 
+  useEffect(() => {
+    setDescriptions(prev => {
+      const next = Array(quantity).fill('')
+      prev.forEach((v, i) => { if (i < quantity) next[i] = v })
+      return next
+    })
+  }, [quantity])
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     setSubmitting(true); setError(null); setNewTokens([])
     try {
-      const res = await apiClient.post<{ tokens: string[] }>('/invites', {
-        quantity,
-        description: quantity === 1 ? (description || null) : undefined,
-      })
-      setNewTokens(res.data.tokens)
-      setDescription('')
+      const results = await Promise.all(
+        descriptions.map(desc =>
+          apiClient.post<{ tokens: string[] }>('/invites', {
+            quantity: 1,
+            description: desc || null,
+          })
+        )
+      )
+      setNewTokens(results.flatMap(r => r.data.tokens))
+      setDescriptions([''])
+      setQuantity(1)
       loadInvites()
     } catch { setError('Erro ao gerar convite(s).') }
     finally { setSubmitting(false) }
@@ -506,12 +520,19 @@ function InvitesSection() {
             <label htmlFor="inviteQuantity">Quantidade:</label>
             <input id="inviteQuantity" type="number" min="1" max="50" value={quantity} onChange={e => setQuantity(parseInt(e.target.value, 10) || 1)} required />
           </div>
-          {quantity === 1 && (
-            <div className="form-group">
-              <label htmlFor="inviteDescription">Destinatário (opcional):</label>
-              <input id="inviteDescription" type="text" value={description} onChange={e => setDescription(e.target.value)} />
-            </div>
-          )}
+          <div className="form-group">
+            <label>Destinatário(s) (opcional):</label>
+            {descriptions.map((desc, i) => (
+              <input
+                key={i}
+                type="text"
+                placeholder={quantity > 1 ? `Convite ${i + 1}` : 'Nome ou identificação'}
+                value={desc}
+                onChange={e => setDescriptions(d => d.map((v, j) => j === i ? e.target.value : v))}
+                style={{ marginBottom: '.4rem' }}
+              />
+            ))}
+          </div>
           <button type="submit" disabled={submitting}>{submitting ? 'Gerando...' : 'Gerar Convite(s)'}</button>
           {error && <p role="alert">{error}</p>}
         </form>
@@ -634,7 +655,7 @@ function TeamsSection({ onTeamsChange }: { onTeamsChange: (teams: CS2Team[]) => 
                 <tr key={team.id}>
                   <td>{team.name}</td>
                   <td>
-                    {team.logoUrl
+                    {team.logoUrl != null && team.logoUrl !== ''
                       ? <img
                           src={team.logoUrl}
                           alt={team.name}
@@ -666,18 +687,70 @@ function TeamsSection({ onTeamsChange }: { onTeamsChange: (teams: CS2Team[]) => 
 }
 
 // ── Jogadores (recebe lista de times atualizada do TeamsSection) ──────────
-function PlayersSection({ teams: _teams }: { teams: CS2Team[] }) {
+function PlayersSection({ teams }: { teams: CS2Team[] }) {
   const [players, setPlayers] = useState<CS2Player[]>([])
+  const [playersError, setPlayersError] = useState<string | null>(null)
+  const [nickname, setNickname] = useState('')
+  const [teamId, setTeamId] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [success, setSuccess] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    getPlayers().then(setPlayers).catch(() => {})
-  }, [])
+  function loadPlayers() {
+    getPlayers()
+      .then(setPlayers)
+      .catch(() => setPlayersError('Erro ao carregar jogadores.'))
+  }
+
+  useEffect(() => { loadPlayers() }, [])
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setSubmitting(true); setSuccess(null); setError(null)
+    try {
+      await apiClient.post('/players', { nickname, teamId: teamId || undefined })
+      setSuccess('Jogador cadastrado com sucesso!')
+      setNickname(''); setTeamId('')
+      loadPlayers()
+    } catch (err: unknown) {
+      const e2 = err as { response?: { data?: { error?: { message?: string } } } }
+      setError(e2.response?.data?.error?.message ?? 'Erro ao cadastrar jogador.')
+    } finally { setSubmitting(false) }
+  }
 
   return (
     <section id="sec-players">
       <h2>👤 Jogadores</h2>
+      <div className="card">
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="playerNickname">Jogador:</label>
+            {playersError
+              ? <p role="alert">{playersError}</p>
+              : <select id="playerNickname" value={nickname} onChange={e => setNickname(e.target.value)} required>
+                  <option value="">Selecione um jogador</option>
+                  {players.map(p => (
+                    <option key={p.id} value={p.nickname} disabled={!!p.teamId}>
+                      {playerLabel(p)}
+                    </option>
+                  ))}
+                </select>
+            }
+          </div>
+          <div className="form-group">
+            <label htmlFor="playerTeam">Time:</label>
+            <select id="playerTeam" value={teamId} onChange={e => setTeamId(e.target.value)} required>
+              <option value="">Selecione um time</option>
+              {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+          <button type="submit" disabled={submitting}>{submitting ? 'Cadastrando...' : 'Atribuir a Time'}</button>
+          {success && <p role="status">{success}</p>}
+          {error && <p role="alert">{error}</p>}
+        </form>
+      </div>
       {players.length > 0 && (
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="card" style={{ padding: 0, overflow: 'hidden', marginTop: '1rem' }}>
           <div className="table-wrapper">
             <table>
               <thead><tr><th>Nickname</th><th>Username</th><th>Time</th><th>Score Atual</th><th>Partidas</th></tr></thead>
@@ -854,7 +927,7 @@ function MatchStatsSection({ games }: { games: Game[] }) {
                 <label htmlFor="statsPlayerSelect">Jogador:</label>
                 <select id="statsPlayerSelect" value={playerId} onChange={e => setPlayerId(e.target.value)} required>
                   <option value="">Selecione um jogador</option>
-                  {players.map(p => <option key={p.id} value={p.id}>{p.username ?? p.nickname} — {p.teamName}</option>)}
+                  {players.map(p => <option key={p.id} value={p.id}>{playerLabel(p)}</option>)}
                 </select>
               </div>
               {[
@@ -897,6 +970,7 @@ function LeaderManagementSection({ teams, users }: { teams: CS2Team[]; users: Us
   const [removeSuccess, setRemoveSuccess] = useState<string | null>(null)
   const [removeError, setRemoveError] = useState<string | null>(null)
 
+  const [moveSourceTeamId, setMoveSourceTeamId] = useState('')
   const [moveUserId, setMoveUserId] = useState('')
   const [moveTeamId, setMoveTeamId] = useState('')
   const [moveSubmitting, setMoveSubmitting] = useState(false)
@@ -935,12 +1009,20 @@ function LeaderManagementSection({ teams, users }: { teams: CS2Team[]; users: Us
     try {
       await apiClient.patch(`/users/${moveUserId}/team`, { teamId: moveTeamId || null })
       setMoveSuccess('Usuário movido com sucesso!')
-      setMoveUserId(''); setMoveTeamId('')
+      setMoveSourceTeamId(''); setMoveUserId(''); setMoveTeamId('')
     } catch (err: unknown) {
       const e2 = err as { response?: { data?: { error?: { message?: string } } } }
       setMoveError(e2.response?.data?.error?.message ?? 'Erro ao mover usuário.')
     } finally { setMoveSubmitting(false) }
   }
+
+  const assignEligibleUsers = assignTeamId
+    ? users.filter(u => u.teamId === assignTeamId)
+    : []
+
+  const moveEligibleUsers = moveSourceTeamId
+    ? users.filter(u => u.teamId === moveSourceTeamId)
+    : []
 
   return (
     <section id="sec-leaders">
@@ -950,16 +1032,16 @@ function LeaderManagementSection({ teams, users }: { teams: CS2Team[]; users: Us
         <form onSubmit={handleAssignLeader}>
           <div className="form-group">
             <label htmlFor="assignLeaderTeam">Time:</label>
-            <select id="assignLeaderTeam" value={assignTeamId} onChange={e => setAssignTeamId(e.target.value)} required>
+            <select id="assignLeaderTeam" value={assignTeamId} onChange={e => { setAssignTeamId(e.target.value); setAssignUserId('') }} required>
               <option value="">Selecione um time</option>
               {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </div>
           <div className="form-group">
             <label htmlFor="assignLeaderUserId">ID do Usuário:</label>
-            <select id="assignLeaderUserId" value={assignUserId} onChange={e => setAssignUserId(e.target.value)} required>
-              <option value="">Selecione um usuário</option>
-              {users.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+            <select id="assignLeaderUserId" value={assignUserId} onChange={e => setAssignUserId(e.target.value)} disabled={!assignTeamId} required>
+              <option value="">{assignTeamId ? 'Selecione um usuário' : 'Selecione um time primeiro'}</option>
+              {assignEligibleUsers.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
             </select>
           </div>
           <button type="submit" disabled={assignSubmitting}>{assignSubmitting ? 'Designando...' : 'Designar Líder'}</button>
@@ -988,10 +1070,18 @@ function LeaderManagementSection({ teams, users }: { teams: CS2Team[]; users: Us
         <h3>Mover Usuário de Time</h3>
         <form onSubmit={handleMoveUser}>
           <div className="form-group">
-            <label htmlFor="moveUserId">ID do Usuário:</label>
-            <select id="moveUserId" value={moveUserId} onChange={e => setMoveUserId(e.target.value)} required>
-              <option value="">Selecione um usuário</option>
-              {users.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+            <label htmlFor="moveSourceTeam">Time de Origem:</label>
+            <select id="moveSourceTeam" value={moveSourceTeamId}
+              onChange={e => { setMoveSourceTeamId(e.target.value); setMoveUserId('') }} required>
+              <option value="">Selecione o time de origem</option>
+              {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="moveUserId">Usuário:</label>
+            <select id="moveUserId" value={moveUserId} onChange={e => setMoveUserId(e.target.value)} disabled={!moveSourceTeamId} required>
+              <option value="">{moveSourceTeamId ? 'Selecione um usuário' : 'Selecione o time de origem primeiro'}</option>
+              {moveEligibleUsers.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
             </select>
           </div>
           <div className="form-group">
@@ -1011,12 +1101,17 @@ function LeaderManagementSection({ teams, users }: { teams: CS2Team[]; users: Us
 }
 
 // ── Troca Direta ──────────────────────────────────────────────────────────
-function DirectSwapSection({ users }: { users: User[] }) {
+function DirectSwapSection({ users, teams }: { users: User[]; teams: CS2Team[] }) {
+  const [teamAId, setTeamAId] = useState('')
+  const [teamBId, setTeamBId] = useState('')
   const [userAId, setUserAId] = useState('')
   const [userBId, setUserBId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const usersTeamA = teamAId ? users.filter(u => u.teamId === teamAId) : []
+  const usersTeamB = teamBId ? users.filter(u => u.teamId === teamBId) : []
 
   async function handleSwap(e: React.FormEvent) {
     e.preventDefault()
@@ -1025,7 +1120,7 @@ function DirectSwapSection({ users }: { users: User[] }) {
     try {
       await apiClient.post('/trades/direct', { userAId, userBId })
       setSuccess('Troca realizada com sucesso!')
-      setUserAId(''); setUserBId('')
+      setTeamAId(''); setTeamBId(''); setUserAId(''); setUserBId('')
     } catch (err: unknown) {
       const e2 = err as { response?: { data?: { error?: { message?: string } } } }
       setError(e2.response?.data?.error?.message ?? 'Erro ao realizar troca.')
@@ -1037,20 +1132,44 @@ function DirectSwapSection({ users }: { users: User[] }) {
       <h2>🔄 Troca Direta</h2>
       <div className="card">
         <form onSubmit={handleSwap}>
+          {/* Grupo A */}
           <div className="form-group">
-            <label htmlFor="swapUserAId">ID do Usuário A:</label>
-            <select id="swapUserAId" value={userAId} onChange={e => setUserAId(e.target.value)} required>
-              <option value="">Selecione o Usuário A</option>
-              {users.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+            <label htmlFor="swapTeamA">Time A:</label>
+            <select id="swapTeamA" value={teamAId}
+              onChange={e => { setTeamAId(e.target.value); setUserAId('') }} required>
+              <option value="">Selecione o Time A</option>
+              {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </div>
           <div className="form-group">
-            <label htmlFor="swapUserBId">ID do Usuário B:</label>
-            <select id="swapUserBId" value={userBId} onChange={e => setUserBId(e.target.value)} required>
-              <option value="">Selecione o Usuário B</option>
-              {users.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+            <label htmlFor="swapUserAId">Jogador A:</label>
+            <select id="swapUserAId" value={userAId}
+              onChange={e => setUserAId(e.target.value)}
+              disabled={!teamAId} required>
+              <option value="">{teamAId ? 'Selecione o Jogador A' : 'Selecione o Time A primeiro'}</option>
+              {usersTeamA.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
             </select>
           </div>
+
+          {/* Grupo B */}
+          <div className="form-group">
+            <label htmlFor="swapTeamB">Time B:</label>
+            <select id="swapTeamB" value={teamBId}
+              onChange={e => { setTeamBId(e.target.value); setUserBId('') }} required>
+              <option value="">Selecione o Time B</option>
+              {teams.filter(t => t.id !== teamAId).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="swapUserBId">Jogador B:</label>
+            <select id="swapUserBId" value={userBId}
+              onChange={e => setUserBId(e.target.value)}
+              disabled={!teamBId} required>
+              <option value="">{teamBId ? 'Selecione o Jogador B' : 'Selecione o Time B primeiro'}</option>
+              {usersTeamB.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+            </select>
+          </div>
+
           <button type="submit" disabled={submitting}>{submitting ? 'Trocando...' : 'Trocar'}</button>
           {success && <p role="status">{success}</p>}
           {error && <p role="alert">{error}</p>}
@@ -1096,7 +1215,7 @@ export default function AdminPage() {
     <div className="page page-admin">
       <h1>⚙️ Administração</h1>
       <AdminNav isMasterAdmin={isMasterAdmin} />
-      <UsersSection currentUser={user} />
+      <UsersSection currentUser={user} teams={teams} />
       {isMasterAdmin && <AdminManagementSection users={users} currentUser={user} onUsersChange={loadUsers} />}
       <CreateGameForm teams={teams} onCreated={loadGames} />
       <StartGameSection games={games} onStarted={loadGames} />
@@ -1107,7 +1226,7 @@ export default function AdminPage() {
       <MapResultSection games={games} />
       <MatchStatsSection games={games} />
       <LeaderManagementSection teams={teams} users={users} />
-      <DirectSwapSection users={users} />
+      <DirectSwapSection users={users} teams={teams} />
     </div>
   )
 }

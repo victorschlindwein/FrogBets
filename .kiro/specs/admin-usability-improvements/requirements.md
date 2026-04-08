@@ -14,6 +14,10 @@ O painel de administração do FrogBets atualmente exige que o admin copie e col
 - **User_Dropdown**: Elemento `<select>` que lista todos os usuários da plataforma pelo username, substituindo campos de input de UUID.
 - **Allocated_Player**: CS2Player que já possui um `teamId` associado.
 - **Unallocated_Player**: CS2Player cujo `teamId` é nulo ou vazio.
+- **InvitesSection**: Subcomponente do Admin_Panel responsável por gerar e listar convites.
+- **LeaderManagementSection**: Subcomponente do Admin_Panel responsável por designar líderes e mover usuários de time.
+- **DirectSwapSection**: Subcomponente do Admin_Panel responsável por realizar trocas diretas de usuários entre times.
+- **TeamsSection**: Subcomponente do Admin_Panel responsável por cadastrar e listar times.
 
 ## Requirements
 
@@ -72,3 +76,68 @@ O painel de administração do FrogBets atualmente exige que o admin copie e col
 1. THE Admin_Panel SHALL carregar a lista de usuários uma única vez no nível da página principal e repassá-la como prop para as seções que precisam de User_Dropdowns (Gestão de Líderes e Troca Direta).
 2. WHEN a lista de usuários é atualizada (ex: após promoção ou remoção de admin), THE Admin_Panel SHALL recarregar a lista e propagar a atualização para todos os User_Dropdowns.
 3. THE Admin_Panel SHALL carregar a lista de CS2Players uma única vez na seção "Jogadores" e recarregá-la após cada cadastro bem-sucedido.
+
+### Requirement 6: Identificação de Destinatário em Convites em Massa
+
+**User Story:** Como admin, quero poder identificar para quem enviei cada convite mesmo ao gerar em massa, para ter rastreabilidade de quem recebeu cada token.
+
+#### Acceptance Criteria
+
+1. WHEN o admin gera convites com quantidade maior que 1, THE InvitesSection SHALL exibir um campo "Descrição" para cada convite gerado, permitindo identificar o destinatário individualmente.
+2. WHEN o admin submete o formulário de geração em massa, THE InvitesSection SHALL enviar o campo `description` individualmente para cada convite via `POST /api/invites`.
+3. THE InvitesSection SHALL exibir a coluna "Descrição" na listagem de convites, mostrando o valor do campo `description` retornado por `GET /api/invites` ou "—" quando ausente.
+4. WHEN um convite possui `description` preenchido, THE InvitesSection SHALL exibir o valor na listagem sem truncamento para descrições de até 100 caracteres.
+
+### Requirement 7: Nome do Time nos Dropdowns de Jogadores
+
+**User Story:** Como admin, quero ver o nome do time ao lado do nome do jogador em todos os dropdowns onde jogadores aparecem, para facilitar atribuições sem precisar memorizar quem pertence a qual time.
+
+#### Acceptance Criteria
+
+1. WHEN um CS2Player é um Allocated_Player, THE Admin_Panel SHALL exibir o nome do jogador seguido do nome do time separado por " - " em todos os dropdowns de jogadores (ex: `FalleN - FURIA`).
+2. WHEN um CS2Player é um Unallocated_Player, THE Admin_Panel SHALL exibir apenas o nickname do jogador, sem sufixo de time.
+3. THE Admin_Panel SHALL aplicar o formato `"nickname - teamName"` de forma consistente em todos os componentes que renderizam dropdowns de CS2Players, incluindo `PlayersSection` e `MatchStatsSection`.
+
+### Requirement 8: Filtro por Time no Dropdown "Designar Líder"
+
+**User Story:** Como admin, quero que o dropdown de usuários na seção "Designar Líder" mostre apenas os membros do time selecionado, para evitar designar como líder um usuário que não pertence ao time.
+
+#### Acceptance Criteria
+
+1. WHEN o admin seleciona um time no formulário "Designar Líder", THE LeaderManagementSection SHALL filtrar o User_Dropdown de usuários para exibir apenas os usuários cujo `teamId` corresponde ao time selecionado.
+2. WHILE nenhum time está selecionado no formulário "Designar Líder", THE LeaderManagementSection SHALL exibir o User_Dropdown vazio ou desabilitado, sem listar usuários.
+3. WHEN o admin altera a seleção de time no formulário "Designar Líder", THE LeaderManagementSection SHALL redefinir a seleção de usuário para o estado vazio.
+
+### Requirement 9: Seleção de Time Antes de Listar Usuários em "Mover Usuário de Time"
+
+**User Story:** Como admin, quero primeiro selecionar o time de origem antes de ver os usuários disponíveis para mover, para não precisar percorrer uma lista com todos os usuários da plataforma.
+
+#### Acceptance Criteria
+
+1. WHEN a seção "Mover Usuário de Time" é renderizada, THE LeaderManagementSection SHALL exibir primeiro um dropdown de seleção de "Time de Origem" antes do dropdown de usuários.
+2. WHEN o admin seleciona um time de origem, THE LeaderManagementSection SHALL filtrar o User_Dropdown para exibir apenas os membros daquele time.
+3. WHILE nenhum time de origem está selecionado, THE LeaderManagementSection SHALL manter o User_Dropdown de usuários desabilitado ou oculto.
+4. WHEN o admin altera o time de origem, THE LeaderManagementSection SHALL redefinir a seleção de usuário para o estado vazio.
+
+### Requirement 10: Fluxo em Duas Etapas na Troca Direta
+
+**User Story:** Como admin, quero selecionar o time antes de ver os jogadores disponíveis em cada lado da troca direta, para não precisar percorrer uma lista com todos os usuários da plataforma.
+
+#### Acceptance Criteria
+
+1. WHEN a seção "Troca Direta" é renderizada, THE DirectSwapSection SHALL exibir dois grupos independentes: "Jogador A" (com seleção de Time A → Usuário A) e "Jogador B" (com seleção de Time B → Usuário B).
+2. WHEN o admin seleciona o Time A, THE DirectSwapSection SHALL filtrar o dropdown de Usuário A para exibir apenas os membros do Time A.
+3. WHEN o admin seleciona o Time B, THE DirectSwapSection SHALL filtrar o dropdown de Usuário B para exibir apenas os membros do Time B.
+4. WHILE nenhum time está selecionado em um grupo, THE DirectSwapSection SHALL manter o dropdown de usuário correspondente desabilitado ou oculto.
+5. WHEN o admin altera a seleção de time em qualquer grupo, THE DirectSwapSection SHALL redefinir a seleção de usuário daquele grupo para o estado vazio.
+6. IF o admin selecionar o mesmo usuário nos dois grupos, THEN THE DirectSwapSection SHALL exibir uma mensagem de erro de validação antes de submeter o formulário.
+
+### Requirement 11: Correção do Carregamento de Logo dos Times
+
+**User Story:** Como admin, quero que as logos dos times sejam exibidas corretamente no painel, para ter confirmação visual de que as imagens foram cadastradas corretamente.
+
+#### Acceptance Criteria
+
+1. WHEN um CS2Team possui `logoUrl` preenchido, THE TeamsSection SHALL exibir a imagem da logo na listagem de times.
+2. IF a imagem de logo não puder ser carregada (URL inválida ou erro de rede), THEN THE TeamsSection SHALL ocultar o elemento de imagem sem exibir ícone de imagem quebrada.
+3. THE TeamsSection SHALL garantir que a URL da logo seja passada corretamente ao atributo `src` do elemento `<img>`, sem transformações que possam invalidar a URL original.

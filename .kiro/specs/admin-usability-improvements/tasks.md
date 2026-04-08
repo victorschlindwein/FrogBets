@@ -64,6 +64,61 @@ Substituir campos de texto livre (UUID e nickname) por dropdowns com dados reais
 - [x] 6. Checkpoint final — Garantir que todos os testes passam
   - Garantir que todos os testes passam. Perguntar ao usuário se houver dúvidas.
 
+- [x] 7. Corrigir carregamento de logo dos times (Bug — Requirement 11)
+  - Investigar por que `team.logoUrl` aparece em branco no painel admin
+  - Verificar o tipo `CS2Team` em `frontend/src/api/players.ts` — garantir que `logoUrl` está tipado como `string | null | undefined` e não apenas `string`
+  - Atualizar a condição de renderização em `TeamsSection` para `{team.logoUrl != null && team.logoUrl !== '' ? <img...> : '—'}`
+  - Verificar se o endpoint `GET /api/teams` retorna o campo `logoUrl` corretamente (inspecionar resposta da API)
+  - _Requirements: 11.1, 11.2, 11.3_
+
+- [x] 8. Adicionar campo `teamId` ao tipo `User` no frontend
+  - Atualizar a interface `User` em `AdminPage.tsx` para incluir `teamId?: string | null`
+  - Verificar que `GET /api/users` já retorna `teamId` (já é exibido na tabela de usuários)
+  - Este campo é pré-requisito para os filtros dos Requirements 8, 9 e 10
+  - _Requirements: 8.1, 9.2, 10.2, 10.3_
+
+- [x] 9. Implementar `playerLabel` e aplicar em todos os dropdowns de jogadores (Requirement 7)
+  - Adicionar função helper `playerLabel(p: CS2Player): string` no escopo do módulo
+  - Retorna `"nickname - teamName"` se `p.teamId` não é vazio, senão apenas `p.nickname`
+  - Aplicar em `PlayersSection` (Player_Dropdown): substituir texto das opções por `playerLabel(p)`
+  - Aplicar em `MatchStatsSection` (statsPlayerSelect): substituir `{p.username ?? p.nickname} — {p.teamName}` por `playerLabel(p)`
+  - _Requirements: 7.1, 7.2, 7.3_
+
+- [x] 10. Implementar convites em massa com descrição individual (Requirement 6)
+  - Substituir o estado `description: string` por `descriptions: string[]` em `InvitesSection`
+  - Adicionar `useEffect` que redimensiona o array `descriptions` quando `quantity` muda
+  - Substituir o bloco `{quantity === 1 && <input description>}` por N inputs (um por convite)
+  - Atualizar o submit para enviar N POSTs paralelos com `quantity: 1` e `description` individual
+  - _Requirements: 6.1, 6.2, 6.3, 6.4_
+
+- [x] 11. Implementar filtro por time no dropdown "Designar Líder" (Requirement 8)
+  - Calcular `assignEligibleUsers` filtrando `users` pelo `teamId === assignTeamId`
+  - Desabilitar o select de usuário enquanto nenhum time estiver selecionado
+  - Resetar `assignUserId` ao mudar `assignTeamId`
+  - _Requirements: 8.1, 8.2, 8.3_
+
+- [x] 12. Implementar seleção de time de origem em "Mover Usuário de Time" (Requirement 9)
+  - Adicionar estado `moveSourceTeamId` em `LeaderManagementSection`
+  - Adicionar dropdown "Time de Origem" antes do dropdown de usuário no formulário "Mover Usuário de Time"
+  - Calcular `moveEligibleUsers` filtrando `users` pelo `teamId === moveSourceTeamId`
+  - Desabilitar o select de usuário enquanto nenhum time de origem estiver selecionado
+  - Resetar `moveUserId` ao mudar `moveSourceTeamId`
+  - _Requirements: 9.1, 9.2, 9.3, 9.4_
+
+- [x] 13. Implementar fluxo em duas etapas na Troca Direta (Requirement 10)
+  - Adicionar `teams: CS2Team[]` como prop em `DirectSwapSection`
+  - Atualizar a chamada em `AdminPage` para `<DirectSwapSection users={users} teams={teams} />`
+  - Adicionar estados `teamAId` e `teamBId` em `DirectSwapSection`
+  - Calcular `usersTeamA` e `usersTeamB` filtrando `users` pelos respectivos teamIds
+  - Substituir os dois selects de usuário por dois grupos (Time + Usuário) independentes
+  - Filtrar o dropdown de Time B para excluir o Time A já selecionado
+  - Resetar seleção de usuário ao mudar o time correspondente
+  - Manter a validação existente de usuários iguais
+  - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6_
+
+- [x] 14. Checkpoint final — Garantir que todos os testes passam após novos itens
+  - Garantir que todos os testes passam. Perguntar ao usuário se houver dúvidas.
+
 ## Notes
 
 - Tasks marcadas com `*` são opcionais e podem ser puladas para MVP mais rápido

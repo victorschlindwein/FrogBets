@@ -158,8 +158,295 @@ O campo `teamId` de `CS2Player` é usado para determinar se o jogador é `Alloca
 | `GET /api/users` falha | `users` permanece `[]`; os selects ficam com apenas a opção placeholder; nenhuma mensagem de erro adicional (já existe tratamento de erro genérico no `AdminPage`) |
 | Usuário A = Usuário B na Troca Direta | Validação client-side antes do submit; exibe `<p role="alert">` sem chamar a API |
 | `POST /api/players` falha | Comportamento existente mantido (já há tratamento de erro) |
+| Logo de time com URL inválida | `onError` no `<img>` oculta o elemento via `style.display = 'none'` |
 
 O carregamento de `users` no `AdminPage` já tem tratamento silencioso (`.catch(() => {})`). Para `players`, o erro é exibido na seção de Jogadores pois é um dado crítico para o formulário daquela seção.
+
+---
+
+## Novos Componentes e Mudanças (Requirements 6–11)
+
+### Requirement 6: Convites em Massa com Descrição Individual
+
+O fluxo atual só permite `description` quando `quantity === 1`. O novo fluxo gera um campo de descrição por convite quando `quantity > 1`.
+
+**Mudança de estado em `InvitesSection`:**
+
+```tsx
+// Substituir o único campo `description` por um array
+const [descriptions, setDescriptions] = useState<string[]>([''])
+
+// Quando quantity muda, redimensionar o array
+useEffect(() => {
+  setDescriptions(prev => {
+    const next = Array(quantity).fill('')
+    prev.forEach((v, i) => { if (i < quantity) next[i] = v })
+    return next
+  })
+}, [quantity])
+```
+
+**No formulário — substituir o bloco `{quantity === 1 && ...}` por:**
+
+```tsx
+<div className="form-group">
+  <label>Destinatário(s) (opcional):</label>
+  {descriptions.map((desc, i) => (
+    <input
+      key={i}
+      type="text"
+      placeholder={quantity > 1 ? `Convite ${i + 1}` : 'Nome ou identificação'}
+      value={desc}
+      onChange={e => setDescriptions(d => d.map((v, j) => j === i ? e.target.value : v))}
+      style={{ marginBottom: '.4rem' }}
+    />
+  ))}
+</div>
+```
+
+**No submit — enviar cada convite individualmente com sua descrição:**
+
+```tsx
+// Ao invés de um único POST com quantity, enviar N POSTs paralelos
+const results = await Promise.all(
+  descriptions.map(desc =>
+    apiClient.post<{ tokens: string[] }>('/invites', {
+      quantity: 1,
+      description: desc || null,
+    })
+  )
+)
+setNewTokens(results.flatMap(r => r.data.tokens))
+```
+
+> **Nota:** Se o backend suportar `description` em geração em massa (array), preferir essa abordagem. Caso contrário, N POSTs paralelos é a solução correta.
+
+### Requirement 7: Nome do Time nos Dropdowns de Jogadores
+
+Padronizar o formato de exibição em todos os dropdowns de `CS2Player`:
+
+```tsx
+// Helper reutilizável
+function playerLabel(p: CS2Player): string {
+  return p.teamId ? `${p.nickname} - ${p.teamName}` : p.nickname
+}
+
+// Uso em PlayersSection (Player_Dropdown)
+<option key={p.id} value={p.nickname} disabled={!!p.teamId}>
+  {playerLabel(p)}
+</option>
+
+// Uso em MatchStatsSection (statsPlayerSelect)
+<option key={p.id} value={p.id}>{playerLabel(p)}</option>
+```
+
+A função `playerLabel` deve ser definida no escopo do módulo (fora dos componentes) para ser reutilizável.
+
+### Requirement 8: Filtro por Time no Dropdown "Designar Líder"
+
+Adicionar estado `assignFilterTeamId` separado do `assignTeamId` (que já é o time destino do líder). Como o time selecionado para designar líder já é o `assignTeamId`, o filtro de usuários usa diretamente esse valor:
+
+```tsx
+// Usuários filtrados para o dropdown de Designar Líder
+const assignEligibleUsers = assignTeamId
+  ? users.filter(u => (u as unknown as { teamId: string | null }).teamId === assignTeamId)
+  : []
+
+// No select de usuário
+<select id="assignLeaderUserId" value={assignUserId}
+  onChange={e => setAssignUserId(e.target.value)}
+  disabled={!assignTeamId} required>
+  <option value="">
+    {assignTeamId ? 'Selecione um usuário' : 'Selecione um time primeiro'}
+  </option>
+  {assignEligibleUsers.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+</select>
+```
+
+Quando `assignTeamId` muda, resetar `assignUserId`:
+
+```tsx
+// No onChange do select de time
+onChange={e => { setAssignTeamId(e.target.value); setAssignUserId('') }}
+```
+
+**Nota:** O tipo `User` precisa ser estendido para incluir `teamId`:
+
+```tsx
+interface User {
+  id: string; username: string; isAdmin: boolean; isMasterAdmin?: boolean
+  teamId?: string | null  // adicionar este campo
+}
+```
+
+### Requirement 9: Seleção de Time de Origem em "Mover Usuário de Time"
+
+Adicionar estado `moveSourceTeamId` para o time de origem:
+
+```tsx
+const [moveSourceTeamId, setMoveSourceTeamId] = useState('')
+
+// Usuários filtrados pelo time de origem
+const moveEligibleUsers = moveSourceTeamId
+  ? users.filter(u => (u as unknown as { teamId: string | null }).teamId === moveSourceTeamId)
+  : []
+```
+
+**No formulário — adicionar dropdown de time de origem antes do dropdown de usuário:**
+
+```tsx
+<div className="form-group">
+  <label htmlFor="moveSourceTeam">Time de Origem:</label>
+  <select id="moveSourceTeam" value={moveSourceTeamId}
+    onChange={e => { setMoveSourceTeamId(e.target.value); setMoveUserId('') }} required>
+    <option value="">Selecione o time de origem</option>
+    {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+  </select>
+</div>
+<div className="form-group">
+  <label htmlFor="moveUserId">Usuário:</label>
+  <select id="moveUserId" value={moveUserId}
+    onChange={e => setMoveUserId(e.target.value)}
+    disabled={!moveSourceTeamId} required>
+    <option value="">
+      {moveSourceTeamId ? 'Selecione um usuário' : 'Selecione o time de origem primeiro'}
+    </option>
+    {moveEligibleUsers.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+  </select>
+</div>
+```
+
+### Requirement 10: Fluxo em Duas Etapas na Troca Direta
+
+Adicionar estados de time para cada lado da troca:
+
+```tsx
+const [teamAId, setTeamAId] = useState('')
+const [teamBId, setTeamBId] = useState('')
+// userAId e userBId já existem
+
+// Usuários filtrados por time
+const usersTeamA = teamAId ? users.filter(u => (u as unknown as { teamId: string | null }).teamId === teamAId) : []
+const usersTeamB = teamBId ? users.filter(u => (u as unknown as { teamId: string | null }).teamId === teamBId) : []
+```
+
+**No formulário — dois grupos independentes:**
+
+```tsx
+{/* Grupo A */}
+<div className="form-group">
+  <label htmlFor="swapTeamA">Time A:</label>
+  <select id="swapTeamA" value={teamAId}
+    onChange={e => { setTeamAId(e.target.value); setUserAId('') }} required>
+    <option value="">Selecione o Time A</option>
+    {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+  </select>
+</div>
+<div className="form-group">
+  <label htmlFor="swapUserAId">Jogador A:</label>
+  <select id="swapUserAId" value={userAId}
+    onChange={e => setUserAId(e.target.value)}
+    disabled={!teamAId} required>
+    <option value="">{teamAId ? 'Selecione o Jogador A' : 'Selecione o Time A primeiro'}</option>
+    {usersTeamA.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+  </select>
+</div>
+
+{/* Grupo B */}
+<div className="form-group">
+  <label htmlFor="swapTeamB">Time B:</label>
+  <select id="swapTeamB" value={teamBId}
+    onChange={e => { setTeamBId(e.target.value); setUserBId('') }} required>
+    <option value="">Selecione o Time B</option>
+    {teams.filter(t => t.id !== teamAId).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+  </select>
+</div>
+<div className="form-group">
+  <label htmlFor="swapUserBId">Jogador B:</label>
+  <select id="swapUserBId" value={userBId}
+    onChange={e => setUserBId(e.target.value)}
+    disabled={!teamBId} required>
+    <option value="">{teamBId ? 'Selecione o Jogador B' : 'Selecione o Time B primeiro'}</option>
+    {usersTeamB.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+  </select>
+</div>
+```
+
+`DirectSwapSection` precisa receber `teams` como prop adicional:
+
+```tsx
+function DirectSwapSection({ users, teams }: { users: User[]; teams: CS2Team[] })
+```
+
+### Requirement 11: Correção do Carregamento de Logo dos Times
+
+O `TeamsSection` já possui o handler `onError` correto:
+
+```tsx
+onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+```
+
+A investigação deve focar em:
+1. Verificar se `team.logoUrl` está sendo retornado corretamente pelo `GET /api/teams`
+2. Verificar se há problema de CORS ou URL relativa vs absoluta
+3. Verificar se o campo `logoUrl` na entidade `CS2Team` do frontend corresponde ao campo retornado pela API
+
+```typescript
+// Verificar o tipo CS2Team em frontend/src/api/players.ts
+interface CS2Team {
+  id: string; name: string; logoUrl?: string; createdAt: string
+}
+```
+
+Se `logoUrl` vier como `null` da API mas o tipo espera `undefined`, a condição `{team.logoUrl ? <img...> : '—'}` pode falhar silenciosamente. Garantir que a verificação seja `{team.logoUrl != null && team.logoUrl !== '' ? <img...> : '—'}`.
+
+## Updated Architecture
+
+```
+AdminPage (root)
+├── carrega users[] (com teamId) → repassa para LeaderManagementSection e DirectSwapSection
+├── carrega teams[] → repassa para LeaderManagementSection e DirectSwapSection (novo)
+├── InvitesSection
+│   └── descriptions[] por convite (novo)
+├── TeamsSection
+│   └── logoUrl fix (novo)
+├── PlayersSection
+│   └── playerLabel() com "nickname - teamName" (novo)
+├── MatchStatsSection
+│   └── playerLabel() com "nickname - teamName" (novo)
+├── LeaderManagementSection (recebe users[] e teams[] como props)
+│   ├── Designar Líder — filtro por assignTeamId (novo)
+│   └── Mover Usuário de Time — moveSourceTeamId + filtro (novo)
+└── DirectSwapSection (recebe users[] e teams[] como props — novo)
+    ├── teamAId → usersTeamA → userAId
+    └── teamBId → usersTeamB → userBId
+```
+
+## Updated Data Models
+
+```typescript
+// User — adicionar teamId para permitir filtragem client-side
+interface User {
+  id: string; username: string; isAdmin: boolean; isMasterAdmin?: boolean
+  teamId?: string | null  // novo campo necessário para filtros
+}
+```
+
+O endpoint `GET /api/users` já retorna `teamId` (visível na tabela de usuários do `UsersSection`). Apenas o tipo TypeScript precisa ser atualizado.
+
+## Updated Correctness Properties
+
+### Property 4: playerLabel é consistente com o estado de alocação
+
+*Para qualquer* CS2Player, `playerLabel(p)` retorna `"nickname - teamName"` se `p.teamId` não é vazio, e `"nickname"` caso contrário. A função é pura e determinística.
+
+**Validates: Requirements 7.1, 7.2**
+
+### Property 5: Filtro de usuários por time é subconjunto correto
+
+*Para qualquer* lista de usuários e qualquer teamId selecionado, os usuários filtrados são exatamente aqueles cujo `teamId` é igual ao teamId selecionado — nem mais, nem menos.
+
+**Validates: Requirements 8.1, 9.2, 10.2, 10.3**
 
 ## Testing Strategy
 

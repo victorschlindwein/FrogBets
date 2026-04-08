@@ -3,7 +3,7 @@ import apiClient, { publicClient } from './client'
 export interface CS2Team {
   id: string;
   name: string;
-  logoUrl?: string;
+  logoUrl?: string | null;
   createdAt: string;
 }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import apiClient from '../api/client'
+import { GamePlayer, getGamePlayers } from '../api/players'
 
 interface Market {
   id: string
@@ -28,19 +29,21 @@ const MARKET_TYPE_LABELS: Record<string, string> = {
 }
 
 const TEAM_MARKETS = ['MapWinner', 'SeriesWinner']
+const PLAYER_MARKETS = ['TopKills', 'MostDeaths', 'MostUtilityDamage']
 
 function marketLabel(market: Market): string {
   const type = MARKET_TYPE_LABELS[market.type] ?? market.type
   return market.mapNumber != null ? `${type} — Mapa ${market.mapNumber}` : type
 }
 
-function BetForm({ market, game }: { market: Market; game: Game }) {
+function BetForm({ market, game, players }: { market: Market; game: Game; players: GamePlayer[] }) {
   const [option, setOption] = useState('')
   const [amount, setAmount] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const isTeamMarket = TEAM_MARKETS.includes(market.type)
+  const isPlayerMarket = PLAYER_MARKETS.includes(market.type)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -70,6 +73,15 @@ function BetForm({ market, game }: { market: Market; game: Game }) {
             <option value={game.teamA}>{game.teamA}</option>
             <option value={game.teamB}>{game.teamB}</option>
           </select>
+        ) : isPlayerMarket ? (
+          <select id={`option-${market.id}`} value={option} onChange={e => setOption(e.target.value)} required>
+            <option value="">Selecione um jogador</option>
+            {players.map(p => (
+              <option key={`${p.nickname}-${p.teamName}`} value={p.nickname}>
+                {p.nickname} - {p.teamName}
+              </option>
+            ))}
+          </select>
         ) : (
           <input id={`option-${market.id}`} type="text" placeholder="Nome do jogador" value={option} onChange={e => setOption(e.target.value)} required />
         )}
@@ -92,6 +104,7 @@ export default function GameDetailPage() {
   const [game, setGame] = useState<Game | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [players, setPlayers] = useState<GamePlayer[]>([])
 
   useEffect(() => {
     if (!id) return
@@ -99,6 +112,13 @@ export default function GameDetailPage() {
       .then(res => setGame(res.data))
       .catch(() => setError('Erro ao carregar jogo.'))
       .finally(() => setLoading(false))
+  }, [id])
+
+  useEffect(() => {
+    if (!id) return
+    getGamePlayers(id)
+      .then(data => setPlayers(data))
+      .catch(() => setPlayers([]))
   }, [id])
 
   if (loading) return <div className="page"><div className="card empty-card"><p>Carregando jogo...</p></div></div>
@@ -125,7 +145,7 @@ export default function GameDetailPage() {
             {openMarkets.map(market => (
               <div key={market.id} className="card">
                 <strong>{marketLabel(market)}</strong>
-                {canBet && <BetForm market={market} game={game} />}
+                {canBet && <BetForm market={market} game={game} players={players} />}
               </div>
             ))}
           </div>

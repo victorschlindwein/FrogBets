@@ -182,6 +182,7 @@ Onde: KPR = kills/rounds, DPR = deaths/rounds, ADR = damage/rounds, Impact = KPR
 |---|---|---|---|
 | GET | `/api/games` | JWT | Listar todos os jogos |
 | GET | `/api/games/{id}` | JWT | Detalhes de um jogo específico |
+| GET | `/api/games/{id}/players` | JWT | Listar jogadores dos dois times do jogo (`{ nickname, teamName }`) |
 | POST | `/api/games` | Admin | Criar jogo (gera mercados automaticamente) |
 | PATCH | `/api/games/{id}` | Admin | Editar jogo agendado (times, data, número de mapas); regenera mercados se `NumberOfMaps` mudar |
 | DELETE | `/api/games/{id}` | Admin | Excluir jogo agendado; cancela apostas e devolve saldo; bloqueado se `InProgress` ou `Finished` |

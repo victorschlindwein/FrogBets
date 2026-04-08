@@ -116,6 +116,26 @@ public class GamesController : ControllerBase
         }
     }
 
+    /// <summary>GET /api/games/{id}/players — authenticated: list players from both teams of the game.</summary>
+    [HttpGet("{id:guid}/players")]
+    [Authorize]
+    public async Task<IActionResult> GetGamePlayers(Guid id)
+    {
+        var game = await _db.Games.AsNoTracking().FirstOrDefaultAsync(g => g.Id == id);
+        if (game is null)
+            return NotFound(new { error = new { code = "GAME_NOT_FOUND", message = "Jogo não encontrado." } });
+
+        var players = await _db.CS2Players
+            .Include(p => p.Team)
+            .AsNoTracking()
+            .Where(p => p.Team.Name == game.TeamA || p.Team.Name == game.TeamB)
+            .OrderBy(p => p.Team.Name).ThenBy(p => p.Nickname)
+            .Select(p => new { nickname = p.Nickname, teamName = p.Team.Name })
+            .ToListAsync();
+
+        return Ok(players);
+    }
+
     /// <summary>POST /api/games/{id}/results — admin: register a market result.</summary>
     [HttpPost("{id:guid}/results")]
     [Authorize]

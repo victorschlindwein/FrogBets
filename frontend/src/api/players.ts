@@ -91,3 +91,11 @@ export const registerMatchStats = (
 
 export const getPlayerStats = (playerId: string): Promise<MatchStatsDto[]> =>
   apiClient.get<MatchStatsDto[]>(`/players/${playerId}/stats`).then((r) => r.data)
+
+export interface GamePlayer {
+  nickname: string;
+  teamName: string;
+}
+
+export const getGamePlayers = (gameId: string): Promise<GamePlayer[]> =>
+  apiClient.get<GamePlayer[]>(`/games/${gameId}/players`).then((r) => r.data)

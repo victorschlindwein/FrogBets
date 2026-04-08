@@ -47,11 +47,17 @@ public class PlayersController : ControllerBase
             return StatusCode(201, player);
         }
         catch (KeyNotFoundException ex) when (ex.Message == "USER_NOT_FOUND")
-            => NotFound(new { error = new { code = ex.Message, message = "Usuário não encontrado." } });
+        {
+            return NotFound(new { error = new { code = ex.Message, message = "Usuário não encontrado." } });
+        }
         catch (InvalidOperationException ex) when (ex.Message == "TEAM_NOT_FOUND")
-            => NotFound(new { error = new { code = ex.Message, message = "Time não encontrado." } });
+        {
+            return NotFound(new { error = new { code = ex.Message, message = "Time não encontrado." } });
+        }
         catch (InvalidOperationException ex) when (ex.Message == "NICKNAME_TAKEN")
-            => Conflict(new { error = new { code = ex.Message, message = "Já existe um jogador com esse username." } });
+        {
+            return Conflict(new { error = new { code = ex.Message, message = "Já existe um jogador com esse username." } });
+        }
     }
 
     /// <summary>PATCH /api/players/{id}/team — admin: assign a player to a team.</summary>
@@ -67,9 +73,13 @@ public class PlayersController : ControllerBase
             return Ok(player);
         }
         catch (KeyNotFoundException ex) when (ex.Message == "PLAYER_NOT_FOUND")
-            => NotFound(new { error = new { code = ex.Message, message = "Jogador não encontrado." } });
+        {
+            return NotFound(new { error = new { code = ex.Message, message = "Jogador não encontrado." } });
+        }
         catch (InvalidOperationException ex) when (ex.Message == "TEAM_NOT_FOUND")
-            => NotFound(new { error = new { code = ex.Message, message = "Time não encontrado." } });
+        {
+            return NotFound(new { error = new { code = ex.Message, message = "Time não encontrado." } });
+        }
     }
 
     /// <summary>GET /api/players/ranking — authenticated: player ranking.</summary>

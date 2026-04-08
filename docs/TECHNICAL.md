@@ -203,9 +203,25 @@ Onde: KPR = kills/rounds, DPR = deaths/rounds, ADR = damage/rounds, Impact = KPR
 ### Convites
 | Método | Rota | Auth | Descrição |
 |---|---|---|---|
-| POST | `/api/invites` | Admin | Gerar token de convite |
+| POST | `/api/invites` | Admin | Gerar 1–50 tokens de convite (validade fixa de 24h) |
 | GET | `/api/invites` | Admin | Listar todos os convites |
 | DELETE | `/api/invites/{id}` | Admin | Revogar convite pendente |
+
+**POST /api/invites — request:**
+```json
+{ "quantity": 3, "description": "opcional, só aceito quando quantity = 1" }
+```
+
+**POST /api/invites — response (201):**
+```json
+{ "tokens": ["aabbcc...", "ddeeff...", "112233..."] }
+```
+
+**Códigos de erro:**
+| Código | HTTP | Descrição |
+|---|---|---|
+| `INVALID_QUANTITY` | 400 | Quantidade menor que 1 |
+| `QUANTITY_LIMIT_EXCEEDED` | 400 | Quantidade maior que 50 |
 
 ### Times e Jogadores
 | Método | Rota | Auth | Descrição |

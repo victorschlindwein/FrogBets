@@ -15,14 +15,14 @@ public class InviteService : IInviteService
         _db = db;
     }
 
-    public async Task<InviteResult> GenerateAsync(DateTime expiresAt, string? description)
+    public async Task<InviteResult> GenerateAsync(string? description)
     {
         var invite = new Invite
         {
             Id = Guid.NewGuid(),
             Token = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLower(),
             Description = description,
-            ExpiresAt = expiresAt,
+            ExpiresAt = DateTime.UtcNow.AddHours(24),
             CreatedAt = DateTime.UtcNow
         };
 

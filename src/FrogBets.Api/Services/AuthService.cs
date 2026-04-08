@@ -88,30 +88,62 @@ public class AuthService : IAuthService
                 throw new InvalidOperationException("TEAM_NOT_FOUND");
         }
 
-        var user = new FrogBets.Domain.Entities.User
+        await using var transaction = await _db.Database.BeginTransactionAsync();
+        try
         {
-            Id              = Guid.NewGuid(),
-            Username        = username,
-            PasswordHash    = BCrypt.Net.BCrypt.HashPassword(password),
-            IsAdmin         = false,
-            VirtualBalance  = 1000m,
-            ReservedBalance = 0m,
-            CreatedAt       = DateTime.UtcNow,
-            TeamId          = teamId,
-        };
-
-        _db.Users.Add(user);
-        await _db.SaveChangesAsync();
-
-        // Mark invite as used — after user is persisted
-        var invite = await _db.Invites.FirstOrDefaultAsync(i => i.Id == inviteId);
-        if (invite is not null)
-        {
-            invite.UsedAt = DateTime.UtcNow;
-            invite.UsedByUserId = user.Id;
+            // 1. INSERT User
+            var user = new FrogBets.Domain.Entities.User
+            {
+                Id              = Guid.NewGuid(),
+                Username        = username,
+                PasswordHash    = BCrypt.Net.BCrypt.HashPassword(password),
+                IsAdmin         = false,
+                VirtualBalance  = 1000m,
+                ReservedBalance = 0m,
+                CreatedAt       = DateTime.UtcNow,
+                TeamId          = teamId,
+            };
+            _db.Users.Add(user);
             await _db.SaveChangesAsync();
-        }
 
-        return await LoginAsync(username, password);
+            // 2. INSERT CS2Player (if teamId provided)
+            if (teamId.HasValue)
+            {
+                var player = new FrogBets.Domain.Entities.CS2Player
+                {
+                    Id           = Guid.NewGuid(),
+                    UserId       = user.Id,
+                    Nickname     = username,
+                    TeamId       = teamId.Value,
+                    PlayerScore  = 0.0,
+                    MatchesCount = 0,
+                    CreatedAt    = DateTime.UtcNow,
+                };
+                _db.CS2Players.Add(player);
+                await _db.SaveChangesAsync();
+            }
+
+            // 3. UPDATE Invite
+            var invite = await _db.Invites.FirstOrDefaultAsync(i => i.Id == inviteId);
+            if (invite is not null)
+            {
+                invite.UsedAt       = DateTime.UtcNow;
+                invite.UsedByUserId = user.Id;
+                await _db.SaveChangesAsync();
+            }
+
+            await transaction.CommitAsync();
+            return await LoginAsync(username, password);
+        }
+        catch (InvalidOperationException)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw new InvalidOperationException("REGISTRATION_FAILED");
+        }
     }
 }

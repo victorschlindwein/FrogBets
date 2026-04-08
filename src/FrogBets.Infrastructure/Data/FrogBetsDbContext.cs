@@ -184,6 +184,16 @@ public class FrogBetsDbContext : DbContext
                 .WithOne(s => s.Player)
                 .HasForeignKey(s => s.PlayerId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(p => p.User)
+                .WithOne()
+                .HasForeignKey<CS2Player>(p => p.UserId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .IsRequired(false);
+
+            e.HasIndex(p => p.UserId)
+                .IsUnique()
+                .HasFilter("\"UserId\" IS NOT NULL");
         });
 
         // MapResult

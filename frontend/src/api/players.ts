@@ -17,6 +17,7 @@ export interface CS2Player {
   playerScore: number;
   matchesCount: number;
   createdAt: string;
+  username?: string;
 }
 
 export interface PlayerRankingItem {
@@ -68,14 +69,6 @@ export const createTeam = (data: { name: string; logoUrl?: string }): Promise<CS
 
 export const getPlayers = (): Promise<CS2Player[]> =>
   apiClient.get<CS2Player[]>('/players').then((r) => r.data)
-
-export const createPlayer = (data: {
-  nickname: string;
-  realName?: string;
-  teamId: string;
-  photoUrl?: string;
-}): Promise<CS2Player> =>
-  apiClient.post<CS2Player>('/players', data).then((r) => r.data)
 
 export const getPlayersRanking = (): Promise<PlayerRankingItem[]> =>
   apiClient.get<PlayerRankingItem[]>('/players/ranking').then((r) => r.data)

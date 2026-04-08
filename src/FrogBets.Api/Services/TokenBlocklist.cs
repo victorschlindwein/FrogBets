@@ -14,7 +14,8 @@ public sealed class TokenBlocklist
 {
     // Hot cache: populated on startup and updated on every Revoke call
     private readonly ConcurrentDictionary<string, byte> _cache = new();
-    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IServiceScopeFactory? _scopeFactory;
+    private readonly FrogBetsDbContext? _directDb;
     private bool _loaded = false;
 
     public TokenBlocklist(IServiceScopeFactory scopeFactory)
@@ -22,23 +23,36 @@ public sealed class TokenBlocklist
         _scopeFactory = scopeFactory;
     }
 
+    private FrogBetsDbContext GetDb(out IDisposable? scope)
+    {
+        if (_directDb is not null)
+        {
+            scope = null;
+            return _directDb;
+        }
+        var s = _scopeFactory!.CreateScope();
+        scope = s;
+        return s.ServiceProvider.GetRequiredService<FrogBetsDbContext>();
+    }
+
     /// <summary>Revokes a token by persisting its JTI to the database.</summary>
     public async Task RevokeAsync(string jti, DateTime expiresAt)
     {
         _cache.TryAdd(jti, 0);
 
-        using var scope = _scopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<FrogBetsDbContext>();
-
-        if (!await db.RevokedTokens.AnyAsync(r => r.Jti == jti))
+        var db = GetDb(out var scope);
+        using (scope)
         {
-            db.RevokedTokens.Add(new RevokedToken
+            if (!await db.RevokedTokens.AnyAsync(r => r.Jti == jti))
             {
-                Jti = jti,
-                RevokedAt = DateTime.UtcNow,
-                ExpiresAt = expiresAt,
-            });
-            await db.SaveChangesAsync();
+                db.RevokedTokens.Add(new RevokedToken
+                {
+                    Jti = jti,
+                    RevokedAt = DateTime.UtcNow,
+                    ExpiresAt = expiresAt,
+                });
+                await db.SaveChangesAsync();
+            }
         }
     }
 
@@ -56,15 +70,17 @@ public sealed class TokenBlocklist
         lock (this)
         {
             if (_loaded) return;
-            using var scope = _scopeFactory.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<FrogBetsDbContext>();
-            var now = DateTime.UtcNow;
-            var active = db.RevokedTokens
-                .Where(r => r.ExpiresAt > now)
-                .Select(r => r.Jti)
-                .ToList();
-            foreach (var j in active)
-                _cache.TryAdd(j, 0);
+            var db = GetDb(out var scope);
+            using (scope)
+            {
+                var now = DateTime.UtcNow;
+                var active = db.RevokedTokens
+                    .Where(r => r.ExpiresAt > now)
+                    .Select(r => r.Jti)
+                    .ToList();
+                foreach (var j in active)
+                    _cache.TryAdd(j, 0);
+            }
             _loaded = true;
         }
     }

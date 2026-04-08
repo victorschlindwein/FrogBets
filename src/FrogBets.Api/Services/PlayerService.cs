@@ -13,46 +13,11 @@ public class PlayerService : IPlayerService
         _db = db;
     }
 
-    public async Task<CS2PlayerDto> CreatePlayerAsync(CreatePlayerRequest request)
-    {
-        if (string.IsNullOrWhiteSpace(request.Nickname))
-            throw new InvalidOperationException("INVALID_PLAYER_DATA");
-
-        var teamExists = await _db.CS2Teams.AnyAsync(t => t.Id == request.TeamId);
-        if (!teamExists)
-            throw new InvalidOperationException("TEAM_NOT_FOUND");
-
-        var nicknameExists = await _db.CS2Players.AnyAsync(p => p.Nickname == request.Nickname);
-        if (nicknameExists)
-            throw new InvalidOperationException("PLAYER_NICKNAME_ALREADY_EXISTS");
-
-        var player = new CS2Player
-        {
-            Id           = Guid.NewGuid(),
-            Nickname     = request.Nickname,
-            RealName     = request.RealName,
-            TeamId       = request.TeamId,
-            PhotoUrl     = request.PhotoUrl,
-            PlayerScore  = 0.0,
-            MatchesCount = 0,
-            CreatedAt    = DateTime.UtcNow,
-        };
-
-        _db.CS2Players.Add(player);
-        await _db.SaveChangesAsync();
-
-        var created = await _db.CS2Players
-            .Include(p => p.Team)
-            .AsNoTracking()
-            .FirstAsync(p => p.Id == player.Id);
-
-        return ToDto(created);
-    }
-
     public async Task<IReadOnlyList<CS2PlayerDto>> GetPlayersAsync()
     {
         var players = await _db.CS2Players
             .Include(p => p.Team)
+            .Include(p => p.User)
             .AsNoTracking()
             .OrderBy(p => p.Nickname)
             .ToListAsync();
@@ -81,5 +46,5 @@ public class PlayerService : IPlayerService
 
     private static CS2PlayerDto ToDto(CS2Player p) =>
         new(p.Id, p.Nickname, p.RealName, p.TeamId, p.Team.Name,
-            p.PhotoUrl, p.PlayerScore, p.MatchesCount, p.CreatedAt);
+            p.PhotoUrl, p.PlayerScore, p.MatchesCount, p.CreatedAt, p.User?.Username);
 }

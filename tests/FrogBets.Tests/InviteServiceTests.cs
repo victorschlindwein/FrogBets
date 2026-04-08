@@ -26,7 +26,7 @@ public class InviteServiceTests
         await using var db = CreateDb();
         var svc = CreateService(db);
 
-        var result = await svc.GenerateAsync(DateTime.UtcNow.AddDays(7), "Test");
+        var result = await svc.GenerateAsync("Test");
 
         Assert.NotEmpty(result.Token);
         Assert.Equal(32, result.Token.Length); // 16 bytes hex = 32 chars
@@ -38,8 +38,8 @@ public class InviteServiceTests
         await using var db = CreateDb();
         var svc = CreateService(db);
 
-        var r1 = await svc.GenerateAsync(DateTime.UtcNow.AddDays(1), null);
-        var r2 = await svc.GenerateAsync(DateTime.UtcNow.AddDays(1), null);
+        var r1 = await svc.GenerateAsync(null);
+        var r2 = await svc.GenerateAsync(null);
 
         Assert.NotEqual(r1.Token, r2.Token);
     }
@@ -50,7 +50,7 @@ public class InviteServiceTests
         await using var db = CreateDb();
         var svc = CreateService(db);
 
-        var result = await svc.GenerateAsync(DateTime.UtcNow.AddDays(1), null);
+        var result = await svc.GenerateAsync(null);
 
         Assert.Equal(FrogBets.Domain.Enums.InviteStatus.Pending, result.Status);
     }
@@ -207,5 +207,43 @@ public class InviteServiceTests
         Assert.Equal(2, results.Count);
         Assert.Contains(results, r => r.Status == FrogBets.Domain.Enums.InviteStatus.Pending);
         Assert.Contains(results, r => r.Status == FrogBets.Domain.Enums.InviteStatus.Expired);
+    }
+
+    // ── GenerateAsync — new behaviour (Task 1.2) ──────────────────────────────
+
+    [Fact]
+    public async Task Generate_ExpiresAtIsApproximately24HoursFromNow()
+    {
+        await using var db = CreateDb();
+        var svc = CreateService(db);
+        var before = DateTime.UtcNow;
+
+        var result = await svc.GenerateAsync(null);
+
+        var expected = before.AddHours(24);
+        Assert.True(result.ExpiresAt >= expected.AddSeconds(-5));
+        Assert.True(result.ExpiresAt <= expected.AddSeconds(5));
+    }
+
+    [Fact]
+    public async Task Generate_DescriptionIsPreservedWhenProvided()
+    {
+        await using var db = CreateDb();
+        var svc = CreateService(db);
+
+        var result = await svc.GenerateAsync("Alice");
+
+        Assert.Equal("Alice", result.Description);
+    }
+
+    [Fact]
+    public async Task Generate_DescriptionIsNullWhenNotProvided()
+    {
+        await using var db = CreateDb();
+        var svc = CreateService(db);
+
+        var result = await svc.GenerateAsync(null);
+
+        Assert.Null(result.Description);
     }
 }

@@ -45,56 +45,6 @@ public class PlayersIntegrationTests : IClassFixture<IntegrationTestFactory>
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
     }
 
-    // ── POST /api/players ─────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task CreatePlayer_AsAdmin_Returns201()
-    {
-        using var db = _factory.CreateDbContext();
-        var admin = await IntegrationTestFactory.SeedUserAsync(db, "admin_player", isAdmin: true);
-        var team  = await SeedTeamAsync("PlayerTeam1");
-        AuthAs(admin.Id, admin.Username, isAdmin: true);
-
-        var res = await _client.PostAsJsonAsync("/api/players", new
-        {
-            nickname = "s1mple_test",
-            teamId   = team.Id,
-        });
-
-        Assert.Equal(HttpStatusCode.Created, res.StatusCode);
-    }
-
-    [Fact]
-    public async Task CreatePlayer_AsNonAdmin_Returns403()
-    {
-        using var db = _factory.CreateDbContext();
-        var user = await IntegrationTestFactory.SeedUserAsync(db, "nonadmin_player");
-        var team = await SeedTeamAsync("PlayerTeam2");
-        AuthAs(user.Id, user.Username);
-
-        var res = await _client.PostAsJsonAsync("/api/players", new
-        {
-            nickname = "player_x",
-            teamId   = team.Id,
-        });
-
-        Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
-    }
-
-    [Fact]
-    public async Task CreatePlayer_DuplicateNickname_Returns409()
-    {
-        using var db = _factory.CreateDbContext();
-        var admin = await IntegrationTestFactory.SeedUserAsync(db, "admin_player2", isAdmin: true);
-        var team  = await SeedTeamAsync("PlayerTeam3");
-        AuthAs(admin.Id, admin.Username, isAdmin: true);
-
-        await _client.PostAsJsonAsync("/api/players", new { nickname = "dupnick", teamId = team.Id });
-        var res = await _client.PostAsJsonAsync("/api/players", new { nickname = "dupnick", teamId = team.Id });
-
-        Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
-    }
-
     // ── GET /api/players ──────────────────────────────────────────────────────
 
     [Fact]

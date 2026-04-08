@@ -98,6 +98,10 @@ public class AuthController : ControllerBase
         {
             return BadRequest(new { error = new { code = "TEAM_NOT_FOUND", message = "Time não encontrado." } });
         }
+        catch (InvalidOperationException ex) when (ex.Message == "REGISTRATION_FAILED")
+        {
+            return StatusCode(500, new { error = new { code = "REGISTRATION_FAILED", message = "Erro interno ao registrar usuário." } });
+        }
     }
 }
 

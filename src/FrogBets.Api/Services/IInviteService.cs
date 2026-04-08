@@ -15,9 +15,9 @@ public record InviteResult(
 public interface IInviteService
 {
     /// <summary>
-    /// Generates a new invite token with the given expiration and optional description.
+    /// Generates a new invite token expiring in 24 hours with an optional description.
     /// </summary>
-    Task<InviteResult> GenerateAsync(DateTime expiresAt, string? description);
+    Task<InviteResult> GenerateAsync(string? description);
 
     /// <summary>
     /// Returns all invites with their calculated status.

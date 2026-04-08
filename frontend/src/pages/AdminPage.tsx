@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import apiClient from '../api/client'
-import { getTeams, createTeam, CS2Team, getPlayers, createPlayer, CS2Player, registerMatchStats, createMapResult, getMapResultsByGame, MapResult } from '../api/players'
+import { getTeams, createTeam, CS2Team, getPlayers, CS2Player, registerMatchStats, createMapResult, getMapResultsByGame, MapResult } from '../api/players'
 
 interface User { id: string; username: string; isAdmin: boolean; isMasterAdmin?: boolean }
 interface Invite {
@@ -453,9 +453,10 @@ function RegisterResultSection({ games }: { games: Game[] }) {
 // ── Convites ──────────────────────────────────────────────────────────────
 function InvitesSection() {
   const [invites, setInvites] = useState<Invite[]>([])
-  const [expiresAt, setExpiresAt] = useState('')
+  const [quantity, setQuantity] = useState(1)
   const [description, setDescription] = useState('')
-  const [newToken, setNewToken] = useState<string | null>(null)
+  const [newTokens, setNewTokens] = useState<string[]>([])
+  const [copiedToken, setCopiedToken] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -466,17 +467,24 @@ function InvitesSection() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
-    setSubmitting(true); setError(null); setNewToken(null)
+    setSubmitting(true); setError(null); setNewTokens([])
     try {
-      const res = await apiClient.post<Invite>('/invites', {
-        expiresAt: new Date(expiresAt).toISOString(),
-        description: description || null,
+      const res = await apiClient.post<{ tokens: string[] }>('/invites', {
+        quantity,
+        description: quantity === 1 ? (description || null) : undefined,
       })
-      setNewToken(res.data.token)
-      setExpiresAt(''); setDescription('')
+      setNewTokens(res.data.tokens)
+      setDescription('')
       loadInvites()
-    } catch { setError('Erro ao gerar convite.') }
+    } catch { setError('Erro ao gerar convite(s).') }
     finally { setSubmitting(false) }
+  }
+
+  function copyToken(token: string) {
+    navigator.clipboard.writeText(token).then(() => {
+      setCopiedToken(token)
+      setTimeout(() => setCopiedToken(null), 1500)
+    })
   }
 
   async function handleRevoke(id: string) {
@@ -495,20 +503,36 @@ function InvitesSection() {
       <div className="card">
         <form onSubmit={handleCreate}>
           <div className="form-group">
-            <label htmlFor="inviteExpiresAt">Expira em:</label>
-            <input id="inviteExpiresAt" type="datetime-local" value={expiresAt} onChange={e => setExpiresAt(e.target.value)} required />
+            <label htmlFor="inviteQuantity">Quantidade:</label>
+            <input id="inviteQuantity" type="number" min="1" max="50" value={quantity} onChange={e => setQuantity(parseInt(e.target.value, 10) || 1)} required />
           </div>
-          <div className="form-group">
-            <label htmlFor="inviteDescription">Destinatário (opcional):</label>
-            <input id="inviteDescription" type="text" value={description} onChange={e => setDescription(e.target.value)} />
-          </div>
-          <button type="submit" disabled={submitting}>{submitting ? 'Gerando...' : 'Gerar Convite'}</button>
+          {quantity === 1 && (
+            <div className="form-group">
+              <label htmlFor="inviteDescription">Destinatário (opcional):</label>
+              <input id="inviteDescription" type="text" value={description} onChange={e => setDescription(e.target.value)} />
+            </div>
+          )}
+          <button type="submit" disabled={submitting}>{submitting ? 'Gerando...' : 'Gerar Convite(s)'}</button>
           {error && <p role="alert">{error}</p>}
         </form>
-        {newToken && (
-          <p role="status" style={{ marginTop: '1rem' }}>
-            Convite gerado: <span className="token-display">{newToken}</span>
-          </p>
+        {newTokens.length > 0 && (
+          <div role="status" style={{ marginTop: '1rem' }}>
+            <p style={{ marginBottom: '.5rem' }}>Convite(s) gerado(s):</p>
+            {newTokens.map(token => (
+              <div key={token} style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.4rem' }}>
+                <span className="token-display">{token}</span>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => copyToken(token)}
+                  style={{ padding: '.15rem .5rem', fontSize: '.75rem' }}
+                  title="Copiar token"
+                >
+                  {copiedToken === token ? '✓' : '📋'}
+                </button>
+              </div>
+            ))}
+          </div>
         )}
       </div>
       {invites.length > 0 && (
@@ -642,90 +666,33 @@ function TeamsSection({ onTeamsChange }: { onTeamsChange: (teams: CS2Team[]) => 
 }
 
 // ── Jogadores (recebe lista de times atualizada do TeamsSection) ──────────
-function PlayersSection({ teams }: { teams: CS2Team[] }) {
+function PlayersSection({ teams: _teams }: { teams: CS2Team[] }) {
   const [players, setPlayers] = useState<CS2Player[]>([])
-  const [playersError, setPlayersError] = useState<string | null>(null)
-  const [nickname, setNickname] = useState('')
-  const [realName, setRealName] = useState('')
-  const [teamId, setTeamId] = useState('')
-  const [photoUrl, setPhotoUrl] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
 
-  function loadPlayers() {
-    getPlayers().then(setPlayers).catch(() => { setPlayersError('Erro ao carregar jogadores.') })
-  }
-
-  useEffect(() => { loadPlayers() }, [])
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setSubmitting(true); setError(null); setSuccess(null)
-    try {
-      await createPlayer({ nickname, realName: realName || undefined, teamId, photoUrl: photoUrl || undefined })
-      setSuccess('Jogador cadastrado com sucesso!')
-      setNickname(''); setRealName(''); setTeamId(''); setPhotoUrl('')
-      loadPlayers()
-    } catch (err: unknown) {
-      const e2 = err as { response?: { data?: { error?: { message?: string } } } }
-      setError(e2.response?.data?.error?.message ?? 'Erro ao cadastrar jogador.')
-    } finally { setSubmitting(false) }
-  }
+  useEffect(() => {
+    getPlayers().then(setPlayers).catch(() => {})
+  }, [])
 
   return (
     <section id="sec-players">
       <h2>👤 Jogadores</h2>
-      <div className="card">
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="playerNickname">Nickname:</label>
-            <select id="playerNickname" value={nickname} onChange={e => setNickname(e.target.value)} required>
-              <option value="">Selecione um jogador</option>
-              {players.map(p => (
-                <option key={p.id} value={p.nickname} disabled={!!p.teamId}>
-                  {!!p.teamId ? `${p.nickname} (${p.teamName})` : p.nickname}
-                </option>
-              ))}
-            </select>
-            {playersError && <p role="alert">{playersError}</p>}
-          </div>
-          <div className="form-group">
-            <label htmlFor="playerRealName">Nome Real (opcional):</label>
-            <input id="playerRealName" type="text" value={realName} onChange={e => setRealName(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label htmlFor="playerTeamId">Time:</label>
-            <select id="playerTeamId" value={teamId} onChange={e => setTeamId(e.target.value)} required>
-              <option value="">Selecione um time</option>
-              {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label htmlFor="playerPhotoUrl">URL da Foto (opcional):</label>
-            <input id="playerPhotoUrl" type="text" value={photoUrl} onChange={e => setPhotoUrl(e.target.value)} />
-          </div>
-          <button type="submit" disabled={submitting}>{submitting ? 'Cadastrando...' : 'Cadastrar Jogador'}</button>
-          {success && <p role="status">{success}</p>}
-          {error && <p role="alert">{error}</p>}
-        </form>
-      </div>
       {players.length > 0 && (
-        <div className="card" style={{ padding: 0, overflow: 'hidden', marginTop: '1rem' }}>
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           <div className="table-wrapper">
-          <table>
-            <thead><tr><th>Nickname</th><th>Time</th><th>Score Atual</th><th>Partidas</th></tr></thead>
-            <tbody>
-              {players.map(p => (
-                <tr key={p.id}>
-                  <td>{p.nickname}</td>
-                  <td>{p.teamName}</td>
-                  <td>{p.playerScore}</td>
-                  <td>{p.matchesCount}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            <table>
+              <thead><tr><th>Nickname</th><th>Username</th><th>Time</th><th>Score Atual</th><th>Partidas</th></tr></thead>
+              <tbody>
+                {players.map(p => (
+                  <tr key={p.id}>
+                    <td>{p.nickname}</td>
+                    <td>{p.username ?? '—'}</td>
+                    <td>{p.teamName}</td>
+                    <td>{p.playerScore}</td>
+                    <td>{p.matchesCount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -887,7 +854,7 @@ function MatchStatsSection({ games }: { games: Game[] }) {
                 <label htmlFor="statsPlayerSelect">Jogador:</label>
                 <select id="statsPlayerSelect" value={playerId} onChange={e => setPlayerId(e.target.value)} required>
                   <option value="">Selecione um jogador</option>
-                  {players.map(p => <option key={p.id} value={p.id}>{p.nickname} — {p.teamName}</option>)}
+                  {players.map(p => <option key={p.id} value={p.id}>{p.username ?? p.nickname} — {p.teamName}</option>)}
                 </select>
               </div>
               {[

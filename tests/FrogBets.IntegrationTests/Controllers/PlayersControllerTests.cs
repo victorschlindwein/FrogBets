@@ -14,50 +14,6 @@ public class PlayersControllerTests : IClassFixture<TestWebApplicationFactory>
         _factory = factory;
     }
 
-    // ── POST /api/players ─────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task CreatePlayer_AsAdmin_Returns201()
-    {
-        // Arrange
-        using var db = SeedHelper.GetDb(_factory);
-        var admin  = await SeedHelper.SeedUserAsync(db, isAdmin: true);
-        var team   = await SeedHelper.SeedTeamAsync(db);
-        var client = _factory.CreateClient();
-        AuthHelper.SetBearerToken(client, admin.Id, admin.Username, isAdmin: true);
-
-        // Act
-        var res = await client.PostAsJsonAsync("/api/players", new
-        {
-            nickname = "player_" + Guid.NewGuid().ToString("N")[..6],
-            teamId   = team.Id,
-        });
-
-        // Assert
-        Assert.Equal(HttpStatusCode.Created, res.StatusCode);
-    }
-
-    [Fact]
-    public async Task CreatePlayer_AsNonAdmin_Returns403()
-    {
-        // Arrange
-        using var db = SeedHelper.GetDb(_factory);
-        var user   = await SeedHelper.SeedUserAsync(db);
-        var team   = await SeedHelper.SeedTeamAsync(db);
-        var client = _factory.CreateClient();
-        AuthHelper.SetBearerToken(client, user.Id, user.Username, isAdmin: false);
-
-        // Act
-        var res = await client.PostAsJsonAsync("/api/players", new
-        {
-            nickname = "player_x",
-            teamId   = team.Id,
-        });
-
-        // Assert
-        Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
-    }
-
     // ── GET /api/players ──────────────────────────────────────────────────────
 
     [Fact]

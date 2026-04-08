@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using FrogBets.Api.Services;
 using FrogBets.Infrastructure.Data;
@@ -21,14 +22,28 @@ public class InvitesController : ControllerBase
         _db = db;
     }
 
-    /// <summary>POST /api/invites — admin: generate a new invite token.</summary>
+    /// <summary>POST /api/invites — admin: generate one or more invite tokens.</summary>
     [HttpPost]
-    public async Task<IActionResult> CreateInvite([FromBody] CreateInviteRequest request)
+    public async Task<IActionResult> CreateInvites([FromBody] CreateInvitesRequest request)
     {
         if (!await IsAdminFromDb()) return Forbid();
 
-        var result = await _inviteService.GenerateAsync(request.ExpiresAt, request.Description);
-        return StatusCode(201, ToResponse(result));
+        if (request.Quantity < 1)
+            return BadRequest(new { error = new { code = "INVALID_QUANTITY", message = "A quantidade deve ser um número inteiro maior que 0." } });
+
+        if (request.Quantity > 50)
+            return BadRequest(new { error = new { code = "QUANTITY_LIMIT_EXCEEDED", message = "A quantidade máxima por requisição é 50." } });
+
+        var description = request.Quantity == 1 ? request.Description : null;
+        var tokens = new List<string>(request.Quantity);
+
+        for (int i = 0; i < request.Quantity; i++)
+        {
+            var result = await _inviteService.GenerateAsync(description);
+            tokens.Add(result.Token);
+        }
+
+        return StatusCode(201, new CreateInvitesResponse(tokens));
     }
 
     /// <summary>GET /api/invites — admin: list all invites.</summary>
@@ -80,5 +95,6 @@ public class InvitesController : ControllerBase
         new(r.Id, r.Token, r.Description, r.ExpiresAt, r.CreatedAt, r.Status.ToString());
 }
 
-public record CreateInviteRequest(DateTime ExpiresAt, string? Description);
+public record CreateInvitesRequest([Range(1, 50)] int Quantity = 1, string? Description = null);
+public record CreateInvitesResponse(IReadOnlyList<string> Tokens);
 public record InviteResponse(Guid Id, string Token, string? Description, DateTime ExpiresAt, DateTime CreatedAt, string Status);

@@ -11,7 +11,10 @@ public class CS2Player
     public int MatchesCount { get; set; } = 0;
     public DateTime CreatedAt { get; set; }
 
+    public Guid? UserId { get; set; }
+
     // Navigation
     public CS2Team Team { get; set; } = null!;
+    public User? User { get; set; }
     public ICollection<MatchStats> Stats { get; set; } = new List<MatchStats>();
 }

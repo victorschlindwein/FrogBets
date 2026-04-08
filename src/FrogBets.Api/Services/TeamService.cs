@@ -59,6 +59,12 @@ public class TeamService : ITeamService
                 .SetProperty(u => u.TeamId, (Guid?)null)
                 .SetProperty(u => u.IsTeamLeader, false));
 
+        // Clear TeamId from CS2Players of this team (preserves stats history)
+        await _db.CS2Players
+            .Where(p => p.TeamId == teamId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(p => p.TeamId, (Guid?)null));
+
         team.IsDeleted = true;
         team.DeletedAt = DateTime.UtcNow;
 

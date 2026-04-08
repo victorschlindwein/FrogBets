@@ -83,12 +83,43 @@ public class TeamMembershipService : ITeamMembershipService
             targetUser.IsTeamLeader = false;
         }
 
+        var previousTeamId = targetUser.TeamId;
         targetUser.TeamId = destinationTeamId;
 
         // Remover trade listing automaticamente ao mudar de time (Requisito 4.6)
         var listing = await _db.TradeListings.FirstOrDefaultAsync(tl => tl.UserId == targetUserId);
         if (listing is not null)
             _db.TradeListings.Remove(listing);
+
+        // Sync CS2Player: create if moving to a team and no player exists yet;
+        // clear TeamId if removing from team (preserves stats history)
+        var existingPlayer = await _db.CS2Players.FirstOrDefaultAsync(p => p.UserId == targetUserId);
+
+        if (destinationTeamId.HasValue)
+        {
+            if (existingPlayer is null)
+            {
+                _db.CS2Players.Add(new FrogBets.Domain.Entities.CS2Player
+                {
+                    Id           = Guid.NewGuid(),
+                    UserId       = targetUserId,
+                    Nickname     = targetUser.Username,
+                    TeamId       = destinationTeamId.Value,
+                    PlayerScore  = 0.0,
+                    MatchesCount = 0,
+                    CreatedAt    = DateTime.UtcNow,
+                });
+            }
+            else
+            {
+                existingPlayer.TeamId = destinationTeamId.Value;
+            }
+        }
+        else if (existingPlayer is not null)
+        {
+            // Removing from team: clear TeamId, preserving stats history
+            existingPlayer.TeamId = null;
+        }
 
         await _db.SaveChangesAsync();
     }

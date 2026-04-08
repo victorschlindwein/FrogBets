@@ -134,7 +134,7 @@ public class GamesController : ControllerBase
         var players = await _db.CS2Players
             .Include(p => p.Team)
             .AsNoTracking()
-            .Where(p => teamIds.Contains(p.TeamId))
+            .Where(p => p.TeamId.HasValue && teamIds.Contains(p.TeamId.Value))
             .OrderBy(p => p.Team.Name).ThenBy(p => p.Nickname)
             .Select(p => new { id = p.Id, nickname = p.Nickname, teamName = p.Team.Name })
             .ToListAsync();

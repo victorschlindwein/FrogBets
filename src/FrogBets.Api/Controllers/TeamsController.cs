@@ -152,9 +152,10 @@ public class TeamsController : ControllerBase
         return Ok(members);
     }
 
-    /// <summary>PUT /api/teams/{teamId}/logo — team leader: update team logo.</summary>
+    /// <summary>PUT /api/teams/{teamId}/logo — team leader: update team logo (base64 image).</summary>
     [HttpPut("{teamId:guid}/logo")]
     [Authorize]
+    [RequestSizeLimit(512 * 1024)] // 512 KB — enough for base64-encoded logo
     public async Task<IActionResult> UpdateLogo(Guid teamId, [FromBody] UpdateLogoBody body)
     {
         if (!await IsLeaderOfTeam(teamId)) return Forbid();

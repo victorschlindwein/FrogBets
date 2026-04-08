@@ -28,23 +28,54 @@ interface TeamCardProps {
   onLogoUpdate: (teamId: string, logoUrl: string | null) => void
 }
 
+const MAX_SIZE = 256 // px
+const MAX_BYTES = 200 * 1024 // 200 KB
+
+function resizeToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const scale = Math.min(1, MAX_SIZE / Math.max(img.width, img.height))
+      const w = Math.round(img.width * scale)
+      const h = Math.round(img.height * scale)
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      canvas.getContext('2d')!.drawImage(img, 0, 0, w, h)
+      // try webp first, fall back to jpeg
+      let data = canvas.toDataURL('image/webp', 0.85)
+      if (data.length > MAX_BYTES * 1.37) data = canvas.toDataURL('image/jpeg', 0.8)
+      if (data.length > MAX_BYTES * 1.37) { reject(new Error('TOO_LARGE')); return }
+      resolve(data)
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('LOAD_ERROR')) }
+    img.src = url
+  })
+}
+
 function TeamCard({ team, members, isLeader, onLogoUpdate }: TeamCardProps) {
-  const [logoInput, setLogoInput] = useState('')
   const [logoError, setLogoError] = useState(false)
   const [cardError, setCardError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
 
-  async function handleUpload() {
-    if (!logoInput.trim()) return
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
     setUploading(true)
     setCardError(null)
     try {
-      const updated = await uploadTeamLogo(team.id, logoInput.trim())
+      const base64 = await resizeToBase64(file)
+      const updated = await uploadTeamLogo(team.id, base64)
       onLogoUpdate(team.id, updated.logoUrl ?? null)
-      setLogoInput('')
       setLogoError(false)
-    } catch {
-      setCardError('Erro ao atualizar logo. Verifique a URL e tente novamente.')
+    } catch (err) {
+      const msg = err instanceof Error && err.message === 'TOO_LARGE'
+        ? 'Imagem muito grande. Use uma imagem menor que 200 KB após redimensionamento.'
+        : 'Erro ao processar imagem. Tente outro arquivo.'
+      setCardError(msg)
     } finally {
       setUploading(false)
     }
@@ -85,21 +116,24 @@ function TeamCard({ team, members, isLeader, onLogoUpdate }: TeamCardProps) {
       {isLeader && (
         <div style={{ marginBottom: '1rem' }}>
           <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            <input
-              type="url"
-              placeholder="URL da nova logo"
-              value={logoInput}
-              onChange={e => setLogoInput(e.target.value)}
-              style={{ flex: 1, minWidth: 200 }}
-              aria-label="URL da nova logo"
-            />
-            <button
-              className="btn-primary"
-              onClick={handleUpload}
-              disabled={uploading || !logoInput.trim()}
+            <label
+              style={{
+                cursor: uploading ? 'not-allowed' : 'pointer',
+                opacity: uploading ? 0.6 : 1,
+              }}
             >
-              Alterar logo
-            </button>
+              <input
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                disabled={uploading}
+                onChange={handleFileChange}
+                aria-label="Alterar logo"
+              />
+              <span className="btn-primary" style={{ pointerEvents: 'none' }}>
+                {uploading ? 'Enviando...' : 'Alterar logo'}
+              </span>
+            </label>
             {team.logoUrl && (
               <button
                 className="btn-danger"

@@ -60,7 +60,7 @@ function AdminNav({ isMasterAdmin }: { isMasterAdmin: boolean }) {
 }
 
 // ── Lista de Usuários ─────────────────────────────────────────────────────
-function UsersSection({ currentUser, teams }: { currentUser: User; teams: CS2Team[] }) {
+function UsersSection({ currentUser }: { currentUser: User }) {
   const [users, setUsers] = useState<User[]>([])
   const [copied, setCopied] = useState<string | null>(null)
 
@@ -75,8 +75,6 @@ function UsersSection({ currentUser, teams }: { currentUser: User; teams: CS2Tea
       setTimeout(() => setCopied(null), 1500)
     })
   }
-
-  const teamNameById = Object.fromEntries(teams.map(t => [t.id, t.name]))
 
   return (
     <section id="sec-users">
@@ -1377,7 +1375,7 @@ export default function AdminPage() {
     <div className="page page-admin">
       <h1>⚙️ Administração</h1>
       <AdminNav isMasterAdmin={isMasterAdmin} />
-      <UsersSection currentUser={user} teams={teams} />
+      <UsersSection currentUser={user} />
       {isMasterAdmin && <AdminManagementSection users={users} currentUser={user} onUsersChange={loadUsers} />}
       <CreateGameForm teams={teams} onCreated={loadGames} />
       <DeleteGameSection games={games} onDeleted={loadGames} />

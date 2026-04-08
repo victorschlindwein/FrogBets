@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import apiClient from '../api/client'
-import { getTeams, createTeam, CS2Team, getPlayers, CS2Player, registerMatchStats, createMapResult, getMapResultsByGame, MapResult } from '../api/players'
+import { getTeams, createTeam, CS2Team, getPlayers, CS2Player, getGamePlayers, registerMatchStats, createMapResult, getMapResultsByGame, MapResult } from '../api/players'
 
 interface User { id: string; username: string; isAdmin: boolean; isMasterAdmin?: boolean; teamId?: string | null; isTeamLeader?: boolean }
 interface Invite {
@@ -689,14 +689,16 @@ function TeamsSection({ onTeamsChange }: { onTeamsChange: (teams: CS2Team[]) => 
 }
 
 // ── Jogadores (recebe lista de times atualizada do TeamsSection) ──────────
-function PlayersSection({ teams }: { teams: CS2Team[] }) {
+function PlayersSection({ teams, users, onUsersChange }: { teams: CS2Team[]; users: User[]; onUsersChange: () => void }) {
   const [players, setPlayers] = useState<CS2Player[]>([])
   const [playersError, setPlayersError] = useState<string | null>(null)
-  const [nickname, setNickname] = useState('')
+  const [userId, setUserId] = useState('')
   const [teamId, setTeamId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const usersWithoutTeam = users.filter(u => !u.teamId)
 
   function loadPlayers() {
     getPlayers()
@@ -710,13 +712,14 @@ function PlayersSection({ teams }: { teams: CS2Team[] }) {
     e.preventDefault()
     setSubmitting(true); setSuccess(null); setError(null)
     try {
-      await apiClient.post('/players', { nickname, teamId: teamId || undefined })
-      setSuccess('Jogador cadastrado com sucesso!')
-      setNickname(''); setTeamId('')
+      await apiClient.post('/players', { userId, teamId })
+      setSuccess('Jogador atribuído com sucesso!')
+      setUserId(''); setTeamId('')
       loadPlayers()
+      onUsersChange()
     } catch (err: unknown) {
       const e2 = err as { response?: { data?: { error?: { message?: string } } } }
-      setError(e2.response?.data?.error?.message ?? 'Erro ao cadastrar jogador.')
+      setError(e2.response?.data?.error?.message ?? 'Erro ao atribuir jogador.')
     } finally { setSubmitting(false) }
   }
 
@@ -726,15 +729,13 @@ function PlayersSection({ teams }: { teams: CS2Team[] }) {
       <div className="card">
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label htmlFor="playerNickname">Jogador:</label>
-            {playersError
-              ? <p role="alert">{playersError}</p>
-              : <select id="playerNickname" value={nickname} onChange={e => setNickname(e.target.value)} required>
+            <label htmlFor="playerUserSelect">Jogador:</label>
+            {usersWithoutTeam.length === 0
+              ? <p style={{ color: 'var(--text-muted)', fontSize: '.9rem' }}>Todos os usuários já estão em times.</p>
+              : <select id="playerUserSelect" value={userId} onChange={e => setUserId(e.target.value)} required>
                   <option value="">Selecione um jogador</option>
-                  {players.map(p => (
-                    <option key={p.id} value={p.nickname} disabled={!!p.teamId}>
-                      {playerLabel(p)}
-                    </option>
+                  {usersWithoutTeam.map(u => (
+                    <option key={u.id} value={u.id}>{u.username}</option>
                   ))}
                 </select>
             }
@@ -746,11 +747,14 @@ function PlayersSection({ teams }: { teams: CS2Team[] }) {
               {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </div>
-          <button type="submit" disabled={submitting}>{submitting ? 'Cadastrando...' : 'Atribuir a Time'}</button>
+          <button type="submit" disabled={submitting || usersWithoutTeam.length === 0}>
+            {submitting ? 'Atribuindo...' : 'Atribuir a Time'}
+          </button>
           {success && <p role="status">{success}</p>}
           {error && <p role="alert">{error}</p>}
         </form>
       </div>
+      {playersError && <p role="alert" style={{ marginTop: '1rem' }}>{playersError}</p>}
       {players.length > 0 && (
         <div className="card" style={{ padding: 0, overflow: 'hidden', marginTop: '1rem' }}>
           <div className="table-wrapper">
@@ -819,7 +823,7 @@ function MapResultSection({ games }: { games: Game[] }) {
             <input id="mapNumber" type="number" min="1" value={mapNumber} onChange={e => setMapNumber(e.target.value)} required />
           </div>
           <div className="form-group">
-            <label htmlFor="mapRounds">Rounds:</label>
+            <label htmlFor="mapRounds">Número de Rounds:</label>
             <input id="mapRounds" type="number" min="1" value={rounds} onChange={e => setRounds(e.target.value)} required />
           </div>
           <button type="submit" disabled={submitting}>{submitting ? 'Registrando...' : 'Registrar Mapa'}</button>
@@ -833,7 +837,7 @@ function MapResultSection({ games }: { games: Game[] }) {
 
 // ── Estatísticas de Partida ───────────────────────────────────────────────
 function MatchStatsSection({ games }: { games: Game[] }) {
-  const [players, setPlayers] = useState<CS2Player[]>([])
+  const [players, setPlayers] = useState<{ id: string; nickname: string; teamName: string }[]>([])
 
   // Etapa 1: selecionar jogo
   const [statsGameId, setStatsGameId] = useState('')
@@ -855,15 +859,14 @@ function MatchStatsSection({ games }: { games: Game[] }) {
   const eligibleGames = games.filter(g => g.status === 'InProgress' || g.status === 'Finished')
 
   useEffect(() => {
-    getPlayers().then(setPlayers).catch(() => {})
-  }, [])
-
-  useEffect(() => {
-    if (!statsGameId) { setMapResults([]); setMapResultId(''); return }
+    if (!statsGameId) { setMapResults([]); setMapResultId(''); setPlayers([]); return }
     setLoadingMaps(true); setMapResultId('')
-    getMapResultsByGame(statsGameId)
-      .then(setMapResults)
-      .catch(() => setMapResults([]))
+    Promise.all([
+      getMapResultsByGame(statsGameId),
+      getGamePlayers(statsGameId),
+    ])
+      .then(([maps, gamePlayers]) => { setMapResults(maps); setPlayers(gamePlayers) })
+      .catch(() => { setMapResults([]); setPlayers([]) })
       .finally(() => setLoadingMaps(false))
   }, [statsGameId])
 
@@ -929,7 +932,7 @@ function MatchStatsSection({ games }: { games: Game[] }) {
                 <label htmlFor="statsPlayerSelect">Jogador:</label>
                 <select id="statsPlayerSelect" value={playerId} onChange={e => setPlayerId(e.target.value)} required>
                   <option value="">Selecione um jogador</option>
-                  {players.map(p => <option key={p.id} value={p.id}>{playerLabel(p)}</option>)}
+                  {players.map(p => <option key={p.id} value={p.id}>{p.nickname} - {p.teamName}</option>)}
                 </select>
               </div>
               {[
@@ -1386,7 +1389,7 @@ export default function AdminPage() {
       <RegisterResultSection games={games} />
       <InvitesSection />
       <TeamsSection onTeamsChange={setTeams} />
-      <PlayersSection teams={teams} />
+      <PlayersSection teams={teams} users={users} onUsersChange={loadUsers} />
       <MapResultSection games={games} />
       <MatchStatsSection games={games} />
       <LeaderManagementSection teams={teams} users={users} />

@@ -125,12 +125,18 @@ public class GamesController : ControllerBase
         if (game is null)
             return NotFound(new { error = new { code = "GAME_NOT_FOUND", message = "Jogo não encontrado." } });
 
+        var teamIds = await _db.CS2Teams
+            .AsNoTracking()
+            .Where(t => t.Name == game.TeamA || t.Name == game.TeamB)
+            .Select(t => t.Id)
+            .ToListAsync();
+
         var players = await _db.CS2Players
             .Include(p => p.Team)
             .AsNoTracking()
-            .Where(p => p.Team.Name == game.TeamA || p.Team.Name == game.TeamB)
+            .Where(p => teamIds.Contains(p.TeamId))
             .OrderBy(p => p.Team.Name).ThenBy(p => p.Nickname)
-            .Select(p => new { nickname = p.Nickname, teamName = p.Team.Name })
+            .Select(p => new { id = p.Id, nickname = p.Nickname, teamName = p.Team.Name })
             .ToListAsync();
 
         return Ok(players);

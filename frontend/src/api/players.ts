@@ -11,8 +11,8 @@ export interface CS2Player {
   id: string;
   nickname: string;
   realName?: string;
-  teamId: string;
-  teamName: string;
+  teamId: string | null;
+  teamName: string | null;
   photoUrl?: string;
   playerScore: number;
   matchesCount: number;
@@ -93,6 +93,7 @@ export const getPlayerStats = (playerId: string): Promise<MatchStatsDto[]> =>
   apiClient.get<MatchStatsDto[]>(`/players/${playerId}/stats`).then((r) => r.data)
 
 export interface GamePlayer {
+  id: string;
   nickname: string;
   teamName: string;
 }

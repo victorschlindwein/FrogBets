@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using FrogBets.Api.Services;
 using FrogBets.Infrastructure.Data;
@@ -31,6 +32,44 @@ public class PlayersController : ControllerBase
 
         var players = await _playerService.GetPlayersAsync();
         return Ok(players);
+    }
+
+    /// <summary>POST /api/players — admin: create a new CS2 player from an existing user.</summary>
+    [HttpPost]
+    [Authorize]
+    public async Task<IActionResult> CreatePlayer([FromBody] CreatePlayerBody body)
+    {
+        if (!await IsAdminFromDb()) return Forbid();
+
+        try
+        {
+            var player = await _playerService.CreatePlayerAsync(body.UserId, body.TeamId);
+            return StatusCode(201, player);
+        }
+        catch (KeyNotFoundException ex) when (ex.Message == "USER_NOT_FOUND")
+            => NotFound(new { error = new { code = ex.Message, message = "Usuário não encontrado." } });
+        catch (InvalidOperationException ex) when (ex.Message == "TEAM_NOT_FOUND")
+            => NotFound(new { error = new { code = ex.Message, message = "Time não encontrado." } });
+        catch (InvalidOperationException ex) when (ex.Message == "NICKNAME_TAKEN")
+            => Conflict(new { error = new { code = ex.Message, message = "Já existe um jogador com esse username." } });
+    }
+
+    /// <summary>PATCH /api/players/{id}/team — admin: assign a player to a team.</summary>
+    [HttpPatch("{id:guid}/team")]
+    [Authorize]
+    public async Task<IActionResult> AssignTeam(Guid id, [FromBody] AssignTeamBody body)
+    {
+        if (!await IsAdminFromDb()) return Forbid();
+
+        try
+        {
+            var player = await _playerService.AssignTeamAsync(id, body.TeamId);
+            return Ok(player);
+        }
+        catch (KeyNotFoundException ex) when (ex.Message == "PLAYER_NOT_FOUND")
+            => NotFound(new { error = new { code = ex.Message, message = "Jogador não encontrado." } });
+        catch (InvalidOperationException ex) when (ex.Message == "TEAM_NOT_FOUND")
+            => NotFound(new { error = new { code = ex.Message, message = "Time não encontrado." } });
     }
 
     /// <summary>GET /api/players/ranking — authenticated: player ranking.</summary>
@@ -101,3 +140,5 @@ public class PlayersController : ControllerBase
 
 public record RegisterStatsBody(Guid MapResultId, int Kills, int Deaths, int Assists,
     double TotalDamage, double KastPercent);
+public record CreatePlayerBody([Required] Guid UserId, [Required] Guid TeamId);
+public record AssignTeamBody([Required] Guid TeamId);

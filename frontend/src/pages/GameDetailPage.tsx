@@ -118,7 +118,10 @@ export default function GameDetailPage() {
     if (!id) return
     getGamePlayers(id)
       .then(data => setPlayers(data))
-      .catch(() => setPlayers([]))
+      .catch((err) => {
+        console.error('Erro ao carregar jogadores do jogo:', err)
+        setPlayers([])
+      })
   }, [id])
 
   if (loading) return <div className="page"><div className="card empty-card"><p>Carregando jogo...</p></div></div>

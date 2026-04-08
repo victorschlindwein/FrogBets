@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react'
 import apiClient from '../api/client'
-import { CS2Team, CS2Player, getTeams, getPlayersByTeam, uploadTeamLogo, removeTeamLogo } from '../api/players'
+import { CS2Team, CS2Player, getTeams, uploadTeamLogo, removeTeamLogo } from '../api/players'
+
+export interface TeamMember {
+  id: string
+  username: string
+  isTeamLeader: boolean
+}
 
 // ── Exported pure function for property-based tests ──────────────────────────
 export function groupPlayersByTeam(players: CS2Player[]): Record<string, CS2Player[]> {
@@ -11,16 +17,20 @@ export function groupPlayersByTeam(players: CS2Player[]): Record<string, CS2Play
   }, {})
 }
 
+const getMembersByTeam = (teamId: string): Promise<TeamMember[]> =>
+  apiClient.get<TeamMember[]>(`/teams/${teamId}/members`).then(r => r.data)
+
 // ── TeamCard ──────────────────────────────────────────────────────────────────
 interface TeamCardProps {
   team: CS2Team
-  players: CS2Player[]
+  members: TeamMember[]
   isLeader: boolean
   onLogoUpdate: (teamId: string, logoUrl: string | null) => void
 }
 
-function TeamCard({ team, players, isLeader, onLogoUpdate }: TeamCardProps) {
+function TeamCard({ team, members, isLeader, onLogoUpdate }: TeamCardProps) {
   const [logoInput, setLogoInput] = useState('')
+  const [logoError, setLogoError] = useState(false)
   const [cardError, setCardError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
 
@@ -32,6 +42,7 @@ function TeamCard({ team, players, isLeader, onLogoUpdate }: TeamCardProps) {
       const updated = await uploadTeamLogo(team.id, logoInput.trim())
       onLogoUpdate(team.id, updated.logoUrl ?? null)
       setLogoInput('')
+      setLogoError(false)
     } catch {
       setCardError('Erro ao atualizar logo. Verifique a URL e tente novamente.')
     } finally {
@@ -45,6 +56,7 @@ function TeamCard({ team, players, isLeader, onLogoUpdate }: TeamCardProps) {
     try {
       await removeTeamLogo(team.id)
       onLogoUpdate(team.id, null)
+      setLogoError(false)
     } catch {
       setCardError('Erro ao remover logo. Tente novamente.')
     } finally {
@@ -52,13 +64,16 @@ function TeamCard({ team, players, isLeader, onLogoUpdate }: TeamCardProps) {
     }
   }
 
+  const showLogo = team.logoUrl && !logoError
+
   return (
     <div role="article" className="card" style={{ marginBottom: '1.25rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-        {team.logoUrl ? (
+        {showLogo ? (
           <img
-            src={team.logoUrl}
+            src={team.logoUrl!}
             alt={`Logo ${team.name}`}
+            onError={() => setLogoError(true)}
             style={{ width: 64, height: 64, objectFit: 'contain', borderRadius: 'var(--radius)', border: '1px solid var(--sand)' }}
           />
         ) : (
@@ -99,32 +114,27 @@ function TeamCard({ team, players, isLeader, onLogoUpdate }: TeamCardProps) {
         </div>
       )}
 
-      {players.length === 0 ? (
+      {members.length === 0 ? (
         <p style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Nenhum jogador cadastrado.</p>
       ) : (
         <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-          {players.map(player => (
-            <li key={player.id} style={{ display: 'flex', alignItems: 'center', gap: '.75rem' }}>
-              {player.photoUrl ? (
-                <img
-                  src={player.photoUrl}
-                  alt={player.nickname}
-                  style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--sand)' }}
-                />
-              ) : (
-                <span
-                  style={{
-                    width: 36, height: 36, borderRadius: '50%',
-                    background: 'var(--cream)', border: '1px solid var(--sand)',
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '1.1rem'
-                  }}
-                  aria-label="Sem foto"
-                >
-                  🎮
-                </span>
-              )}
-              <span style={{ fontWeight: 500 }}>{player.nickname}</span>
+          {members.map(member => (
+            <li key={member.id} style={{ display: 'flex', alignItems: 'center', gap: '.75rem' }}>
+              <span
+                style={{
+                  width: 36, height: 36, borderRadius: '50%',
+                  background: 'var(--cream)', border: '1px solid var(--sand)',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '1.1rem'
+                }}
+                aria-label="Sem foto"
+              >
+                🎮
+              </span>
+              <span style={{ fontWeight: 500 }}>
+                {member.username}
+                {member.isTeamLeader && <span style={{ marginLeft: '.4rem', fontSize: '.75rem', color: 'var(--text-muted)' }}>👑</span>}
+              </span>
             </li>
           ))}
         </ul>
@@ -141,7 +151,7 @@ interface MeResponse {
 
 export default function TeamsPage() {
   const [teams, setTeams] = useState<CS2Team[]>([])
-  const [playersByTeam, setPlayersByTeam] = useState<Record<string, CS2Player[]>>({})
+  const [membersByTeam, setMembersByTeam] = useState<Record<string, TeamMember[]>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [me, setMe] = useState<MeResponse | null>(null)
@@ -162,26 +172,23 @@ export default function TeamsPage() {
           return
         }
 
-        const playerResults = await Promise.all(
+        const memberResults = await Promise.all(
           fetchedTeams.map(t =>
-            getPlayersByTeam(t.id)
-              .then(players => ({ teamId: t.id, players }))
-              .catch(() => { throw new Error('players') })
+            getMembersByTeam(t.id)
+              .then(members => ({ teamId: t.id, members }))
+              .catch(() => ({ teamId: t.id, members: [] as TeamMember[] }))
           )
         )
 
-        const map: Record<string, CS2Player[]> = {}
-        for (const { teamId, players } of playerResults) {
-          map[teamId] = players
+        const map: Record<string, TeamMember[]> = {}
+        for (const { teamId, members } of memberResults) {
+          map[teamId] = members
         }
 
         setTeams(fetchedTeams)
-        setPlayersByTeam(map)
-      } catch (err: unknown) {
-        const msg = err instanceof Error && err.message === 'players'
-          ? 'Erro ao carregar jogadores.'
-          : 'Erro ao carregar times.'
-        setError(msg)
+        setMembersByTeam(map)
+      } catch {
+        setError('Erro ao carregar times.')
       } finally {
         setLoading(false)
       }
@@ -215,7 +222,7 @@ export default function TeamsPage() {
           <TeamCard
             key={team.id}
             team={team}
-            players={playersByTeam[team.id] ?? []}
+            members={membersByTeam[team.id] ?? []}
             isLeader={!!(me?.isTeamLeader && me.teamId === team.id)}
             onLogoUpdate={handleLogoUpdate}
           />

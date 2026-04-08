@@ -122,7 +122,7 @@ public class TeamsController : ControllerBase
         }
     }
 
-    /// <summary>GET /api/teams/{teamId}/players — authenticated: list players of a team.</summary>
+    /// <summary>GET /api/teams/{teamId}/players — authenticated: list CS2 players of a team.</summary>
     [HttpGet("{teamId:guid}/players")]
     [Authorize]
     public async Task<IActionResult> GetPlayersByTeam(Guid teamId)
@@ -132,6 +132,24 @@ public class TeamsController : ControllerBase
 
         var players = await _playerService.GetPlayersByTeamAsync(teamId);
         return Ok(players);
+    }
+
+    /// <summary>GET /api/teams/{teamId}/members — authenticated: list user members of a team.</summary>
+    [HttpGet("{teamId:guid}/members")]
+    [Authorize]
+    public async Task<IActionResult> GetMembersByTeam(Guid teamId)
+    {
+        var teamExists = await _db.CS2Teams.AsNoTracking().AnyAsync(t => t.Id == teamId && !t.IsDeleted);
+        if (!teamExists) return NotFound(new { error = new { code = "TEAM_NOT_FOUND", message = "Time não encontrado." } });
+
+        var members = await _db.Users
+            .AsNoTracking()
+            .Where(u => u.TeamId == teamId)
+            .OrderBy(u => u.Username)
+            .Select(u => new { u.Id, u.Username, u.IsTeamLeader })
+            .ToListAsync();
+
+        return Ok(members);
     }
 
     /// <summary>PUT /api/teams/{teamId}/logo — team leader: update team logo.</summary>

@@ -8,14 +8,14 @@ import TeamsPage from './TeamsPage'
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 const team1 = { id: 'team-1', name: 'Frog Alpha', logoUrl: 'https://example.com/logo.png', createdAt: '2024-01-01' }
 const team2 = { id: 'team-2', name: 'Frog Beta', logoUrl: null, createdAt: '2024-01-01' }
-const player1 = { id: 'p-1', nickname: 'xXx_Frog', realName: 'João', teamId: 'team-1', teamName: 'Frog Alpha', photoUrl: null, playerScore: 1.2, matchesCount: 5, createdAt: '2024-01-01' }
+const member1 = { id: 'u-1', username: 'xXx_Frog', isTeamLeader: false }
 const meLeader = { username: 'leader', isAdmin: false, isTeamLeader: true, teamId: 'team-1' }
 const mePlayer = { username: 'player', isAdmin: false, isTeamLeader: false, teamId: 'team-1' }
 
 // ── MSW Server ────────────────────────────────────────────────────────────────
 const server = setupServer(
   http.get('/api/teams', () => HttpResponse.json([team1, team2])),
-  http.get('/api/teams/:teamId/players', () => HttpResponse.json([])),
+  http.get('/api/teams/:teamId/members', () => HttpResponse.json([])),
   http.get('/api/users/me', () => HttpResponse.json(mePlayer)),
 )
 
@@ -56,19 +56,6 @@ describe('TeamsPage', () => {
     })
   })
 
-  it('exibe role="alert" quando GET /api/teams/{id}/players falha', async () => {
-    server.use(
-      http.get('/api/teams', () => HttpResponse.json([team1])),
-      http.get('/api/teams/:teamId/players', () => HttpResponse.error())
-    )
-
-    renderPage()
-
-    await waitFor(() => {
-      expect(screen.getByRole('alert')).toBeInTheDocument()
-    })
-  })
-
   it('exibe "Nenhum time cadastrado." quando API retorna lista vazia', async () => {
     server.use(
       http.get('/api/teams', () => HttpResponse.json([]))
@@ -90,10 +77,10 @@ describe('TeamsPage', () => {
     })
   })
 
-  it('exibe nome e jogadores do time no card', async () => {
+  it('exibe nome e membros do time no card', async () => {
     server.use(
       http.get('/api/teams', () => HttpResponse.json([team1])),
-      http.get('/api/teams/:teamId/players', () => HttpResponse.json([player1]))
+      http.get('/api/teams/:teamId/members', () => HttpResponse.json([member1]))
     )
 
     renderPage()
@@ -106,7 +93,8 @@ describe('TeamsPage', () => {
 
   it('exibe placeholder 🐸 quando time não tem logoUrl', async () => {
     server.use(
-      http.get('/api/teams', () => HttpResponse.json([team2]))
+      http.get('/api/teams', () => HttpResponse.json([team2])),
+      http.get('/api/teams/:teamId/members', () => HttpResponse.json([]))
     )
 
     renderPage()
@@ -116,10 +104,10 @@ describe('TeamsPage', () => {
     })
   })
 
-  it('exibe "Nenhum jogador cadastrado." quando time não tem jogadores', async () => {
+  it('exibe "Nenhum jogador cadastrado." quando time não tem membros', async () => {
     server.use(
       http.get('/api/teams', () => HttpResponse.json([team1])),
-      http.get('/api/teams/:teamId/players', () => HttpResponse.json([]))
+      http.get('/api/teams/:teamId/members', () => HttpResponse.json([]))
     )
 
     renderPage()
@@ -132,7 +120,7 @@ describe('TeamsPage', () => {
   it('botões de logo visíveis quando usuário é líder do time', async () => {
     server.use(
       http.get('/api/teams', () => HttpResponse.json([team1])),
-      http.get('/api/teams/:teamId/players', () => HttpResponse.json([])),
+      http.get('/api/teams/:teamId/members', () => HttpResponse.json([])),
       http.get('/api/users/me', () => HttpResponse.json(meLeader))
     )
 
@@ -146,7 +134,7 @@ describe('TeamsPage', () => {
   it('botões de logo ausentes quando usuário não é líder', async () => {
     server.use(
       http.get('/api/teams', () => HttpResponse.json([team1])),
-      http.get('/api/teams/:teamId/players', () => HttpResponse.json([])),
+      http.get('/api/teams/:teamId/members', () => HttpResponse.json([])),
       http.get('/api/users/me', () => HttpResponse.json(mePlayer))
     )
 

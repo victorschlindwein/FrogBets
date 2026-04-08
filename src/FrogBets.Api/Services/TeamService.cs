@@ -18,7 +18,7 @@ public class TeamService : ITeamService
         if (string.IsNullOrWhiteSpace(request.Name))
             throw new InvalidOperationException("INVALID_TEAM_NAME");
 
-        var exists = await _db.CS2Teams.AnyAsync(t => t.Name == request.Name);
+        var exists = await _db.CS2Teams.AnyAsync(t => t.Name == request.Name && !t.IsDeleted);
         if (exists)
             throw new InvalidOperationException("TEAM_NAME_ALREADY_EXISTS");
 
@@ -51,6 +51,13 @@ public class TeamService : ITeamService
     {
         var team = await _db.CS2Teams.FirstOrDefaultAsync(t => t.Id == teamId && !t.IsDeleted)
             ?? throw new InvalidOperationException("TEAM_NOT_FOUND");
+
+        // Clear team membership and leadership from all users in this team
+        await _db.Users
+            .Where(u => u.TeamId == teamId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(u => u.TeamId, (Guid?)null)
+                .SetProperty(u => u.IsTeamLeader, false));
 
         team.IsDeleted = true;
         team.DeletedAt = DateTime.UtcNow;

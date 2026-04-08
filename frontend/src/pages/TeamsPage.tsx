@@ -117,6 +117,8 @@ function TeamCard({ team, members, isLeader, onLogoUpdate }: TeamCardProps) {
         <div style={{ marginBottom: '1rem' }}>
           <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <label
+              role="button"
+              aria-label="Alterar logo"
               style={{
                 cursor: uploading ? 'not-allowed' : 'pointer',
                 opacity: uploading ? 0.6 : 1,

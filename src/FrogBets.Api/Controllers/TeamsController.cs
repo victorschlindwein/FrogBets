@@ -13,12 +13,15 @@ public class TeamsController : ControllerBase
 {
     private readonly ITeamService _teamService;
     private readonly ITeamMembershipService _teamMembershipService;
+    private readonly IPlayerService _playerService;
     private readonly FrogBetsDbContext _db;
 
-    public TeamsController(ITeamService teamService, ITeamMembershipService teamMembershipService, FrogBetsDbContext db)
+    public TeamsController(ITeamService teamService, ITeamMembershipService teamMembershipService,
+        IPlayerService playerService, FrogBetsDbContext db)
     {
         _teamService = teamService;
         _teamMembershipService = teamMembershipService;
+        _playerService = playerService;
         _db = db;
     }
 
@@ -119,6 +122,54 @@ public class TeamsController : ControllerBase
         }
     }
 
+    /// <summary>GET /api/teams/{teamId}/players — authenticated: list players of a team.</summary>
+    [HttpGet("{teamId:guid}/players")]
+    [Authorize]
+    public async Task<IActionResult> GetPlayersByTeam(Guid teamId)
+    {
+        var teamExists = await _db.CS2Teams.AsNoTracking().AnyAsync(t => t.Id == teamId && !t.IsDeleted);
+        if (!teamExists) return NotFound(new { error = new { code = "TEAM_NOT_FOUND", message = "Time não encontrado." } });
+
+        var players = await _playerService.GetPlayersByTeamAsync(teamId);
+        return Ok(players);
+    }
+
+    /// <summary>PUT /api/teams/{teamId}/logo — team leader: update team logo.</summary>
+    [HttpPut("{teamId:guid}/logo")]
+    [Authorize]
+    public async Task<IActionResult> UpdateLogo(Guid teamId, [FromBody] UpdateLogoBody body)
+    {
+        if (!await IsLeaderOfTeam(teamId)) return Forbid();
+
+        try
+        {
+            var team = await _teamService.UpdateLogoAsync(teamId, body.LogoUrl);
+            return Ok(team);
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "TEAM_NOT_FOUND")
+        {
+            return NotFound(new { error = new { code = ex.Message, message = "Time não encontrado." } });
+        }
+    }
+
+    /// <summary>DELETE /api/teams/{teamId}/logo — team leader: remove team logo.</summary>
+    [HttpDelete("{teamId:guid}/logo")]
+    [Authorize]
+    public async Task<IActionResult> RemoveLogo(Guid teamId)
+    {
+        if (!await IsLeaderOfTeam(teamId)) return Forbid();
+
+        try
+        {
+            await _teamService.UpdateLogoAsync(teamId, null);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "TEAM_NOT_FOUND")
+        {
+            return NotFound(new { error = new { code = ex.Message, message = "Time não encontrado." } });
+        }
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private async Task<bool> IsAdminFromDb()
@@ -127,6 +178,15 @@ public class TeamsController : ControllerBase
         if (!Guid.TryParse(sub, out var userId)) return false;
         return await _db.Users.AsNoTracking().AnyAsync(u => u.Id == userId && u.IsAdmin);
     }
+
+    private async Task<bool> IsLeaderOfTeam(Guid teamId)
+    {
+        var sub = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (!Guid.TryParse(sub, out var userId)) return false;
+        return await _db.Users.AsNoTracking()
+            .AnyAsync(u => u.Id == userId && u.IsTeamLeader && u.TeamId == teamId);
+    }
 }
 
 public record CreateTeamBody(string Name, string? LogoUrl);
+public record UpdateLogoBody(string? LogoUrl);

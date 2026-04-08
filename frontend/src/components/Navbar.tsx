@@ -47,6 +47,7 @@ export default function Navbar() {
         <Link to="/marketplace" onClick={closeMenu}>Marketplace</Link>
         <Link to="/leaderboard" onClick={closeMenu}>Ranking Apostas</Link>
         <Link to="/players/ranking" onClick={closeMenu}>Ranking CS2</Link>
+        <Link to="/teams" onClick={closeMenu}>Times</Link>
         {me?.isAdmin && <Link to="/admin" onClick={closeMenu}>Admin</Link>}
         <span className="nav-spacer" />
         <span className="nav-user">{me?.username}</span>

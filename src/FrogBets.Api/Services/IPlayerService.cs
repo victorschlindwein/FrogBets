@@ -7,6 +7,7 @@ public record PlayerRankingItemDto(int Position, Guid PlayerId, string Nickname,
 public interface IPlayerService
 {
     Task<IReadOnlyList<CS2PlayerDto>> GetPlayersAsync();
+    Task<IReadOnlyList<CS2PlayerDto>> GetPlayersByTeamAsync(Guid teamId);
     Task<IReadOnlyList<PlayerRankingItemDto>> GetRankingAsync();
     Task<CS2PlayerDto> CreatePlayerAsync(Guid userId, Guid teamId);
     Task<CS2PlayerDto> AssignTeamAsync(Guid playerId, Guid teamId);

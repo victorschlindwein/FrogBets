@@ -58,6 +58,17 @@ public class TeamService : ITeamService
         await _db.SaveChangesAsync();
     }
 
+    public async Task<CS2TeamDto> UpdateLogoAsync(Guid teamId, string? logoUrl)
+    {
+        var team = await _db.CS2Teams.FirstOrDefaultAsync(t => t.Id == teamId && !t.IsDeleted)
+            ?? throw new InvalidOperationException("TEAM_NOT_FOUND");
+
+        team.LogoUrl = logoUrl;
+        await _db.SaveChangesAsync();
+
+        return ToDto(team);
+    }
+
     private static CS2TeamDto ToDto(CS2Team t) =>
         new(t.Id, t.Name, t.LogoUrl, t.CreatedAt);
 }

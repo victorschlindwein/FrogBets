@@ -9,6 +9,7 @@ import MarketplacePage from './pages/MarketplacePage'
 import LeaderboardPage from './pages/LeaderboardPage'
 import AdminPage from './pages/AdminPage'
 import PlayersRankingPage from './pages/PlayersRankingPage'
+import TeamsPage from './pages/TeamsPage'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
           <Route path="/marketplace" element={<MarketplacePage />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
           <Route path="/players/ranking" element={<PlayersRankingPage />} />
+          <Route path="/teams" element={<TeamsPage />} />
           <Route path="/admin" element={<AdminPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

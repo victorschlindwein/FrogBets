@@ -25,6 +25,19 @@ public class PlayerService : IPlayerService
         return players.Select(ToDto).ToList();
     }
 
+    public async Task<IReadOnlyList<CS2PlayerDto>> GetPlayersByTeamAsync(Guid teamId)
+    {
+        var players = await _db.CS2Players
+            .Include(p => p.Team)
+            .Include(p => p.User)
+            .AsNoTracking()
+            .Where(p => p.TeamId == teamId)
+            .OrderBy(p => p.Nickname)
+            .ToListAsync();
+
+        return players.Select(ToDto).ToList();
+    }
+
     public async Task<CS2PlayerDto> CreatePlayerAsync(Guid userId, Guid teamId)
     {
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId)

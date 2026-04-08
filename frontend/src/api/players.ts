@@ -100,3 +100,12 @@ export interface GamePlayer {
 
 export const getGamePlayers = (gameId: string): Promise<GamePlayer[]> =>
   apiClient.get<GamePlayer[]>(`/games/${gameId}/players`).then((r) => r.data)
+
+export const getPlayersByTeam = (teamId: string): Promise<CS2Player[]> =>
+  apiClient.get<CS2Player[]>(`/teams/${teamId}/players`).then(r => r.data)
+
+export const uploadTeamLogo = (teamId: string, logoUrl: string): Promise<CS2Team> =>
+  apiClient.put<CS2Team>(`/teams/${teamId}/logo`, { logoUrl }).then(r => r.data)
+
+export const removeTeamLogo = (teamId: string): Promise<void> =>
+  apiClient.delete(`/teams/${teamId}/logo`).then(() => undefined)

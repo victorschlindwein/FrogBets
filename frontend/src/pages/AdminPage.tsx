@@ -21,9 +21,6 @@ function marketLabel(m: Market) {
   const t = MARKET_TYPE_LABELS[m.type] ?? m.type
   return m.mapNumber != null ? `${t} — Mapa ${m.mapNumber}` : t
 }
-function playerLabel(p: CS2Player): string {
-  return p.teamId ? `${p.nickname} - ${p.teamName}` : p.nickname
-}
 
 // ── Índice de navegação ───────────────────────────────────────────────────
 const NAV_ITEMS_BASE = [

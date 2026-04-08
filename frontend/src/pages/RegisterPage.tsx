@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import apiClient, { setToken } from '../api/client'
-import { getTeams, CS2Team } from '../api/players'
+import apiClient, { publicClient, setToken } from '../api/client'
+import { CS2Team } from '../api/players'
 
 const ERROR_MESSAGES: Record<string, string> = {
   INVALID_INVITE: 'Convite inválido ou expirado.',
@@ -21,7 +21,7 @@ export default function RegisterPage() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    getTeams().then(setTeams).catch(() => {})
+    publicClient.get<CS2Team[]>('/teams').then(r => setTeams(r.data)).catch(() => {})
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {

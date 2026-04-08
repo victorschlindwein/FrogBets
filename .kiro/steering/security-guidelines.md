@@ -20,6 +20,7 @@ inclusion: always
 - **Logout real:** o `jti` é adicionado à `TokenBlocklist` (persistida no banco + cache em memória). Tokens revogados são rejeitados mesmo antes de expirar.
 - **`IsTeamLeader` não está no JWT** — verificar sempre consultando o banco para evitar tokens desatualizados após mudança de papel.
 - **Rate limiting:** endpoints de auth têm limite de 5 requisições por 15 minutos por IP.
+- **Master Admin:** configurado via `MasterAdminUsername` no `appsettings.json`. Não está no JWT — verificar sempre via config. Único que pode promover/revogar outros admins e não pode ser rebaixado.
 
 ## Operações Financeiras (Saldo Virtual)
 
@@ -54,3 +55,10 @@ Esses valores foram removidos no commit `0273b23`. Como o repositório é públi
 - Endpoints públicos: marcar explicitamente com `[AllowAnonymous]`.
 - Nunca expor `PasswordHash` em respostas da API.
 - Nunca expor dados de outros usuários além do necessário (username, saldo público no leaderboard).
+
+## Auditoria
+
+- Operações administrativas sensíveis devem ser registradas via `IAuditLogService`.
+- Logs incluem: `ActorId`, `Username`, `Action`, `ResourceType`, `ResourceId`, `StatusCode`, `Details`.
+- Retenção configurável via `AUDIT_LOG_RETENTION_DAYS` (padrão: 90 dias).
+- Limpeza automática via `AuditLogCleanupService` (background service).

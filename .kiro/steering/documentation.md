@@ -49,7 +49,8 @@ Atualizar quando:
 - [ ] `docs/TECHNICAL.md` tem os endpoints e serviços atualizados?
 - [ ] Novos campos de entidade estão documentados?
 - [ ] Novas variáveis de ambiente estão em `.env.example` e documentadas?
-- [ ] Todos os testes passam (`dotnet test` + `npm run test -- --run`)?
+- [ ] `npx tsc --noEmit` no frontend passa sem erros?
+- [ ] Todos os testes passam (`dotnet test` + `npm run test`)?
 
 ## O Que Não Documentar
 

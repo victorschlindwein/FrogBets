@@ -37,9 +37,11 @@ Use este guia ao criar uma nova spec ou implementar uma nova funcionalidade.
 ## 5. Testes
 
 - [ ] Criar arquivo de testes unitários `XxxTests.cs` em `tests/FrogBets.Tests/`
+- [ ] Criar testes de integração em `tests/FrogBets.IntegrationTests/` se o endpoint for novo
 - [ ] Implementar property-based tests (FsCheck) para cada propriedade de corretude da spec
 - [ ] Tag obrigatória nos property-tests: `// Feature: nome-da-spec, Property N: descrição`
 - [ ] Rodar `dotnet test` e garantir que todos os testes passam
+- [ ] Para frontend: criar `XxxPage.test.tsx` usando Vitest + Testing Library + MSW
 
 ## 6. Documentação
 
@@ -51,6 +53,7 @@ Use este guia ao criar uma nova spec ou implementar uma nova funcionalidade.
 
 - [ ] Commits descritivos em português ou inglês
 - [ ] Não commitar `.env`, `appsettings.Development.json` ou qualquer secret
+- [ ] Rodar `npx tsc --noEmit` no frontend antes do commit (evita quebrar o build da imagem Docker)
 - [ ] Rodar `dotnet test` antes do commit final
 
 ## Padrões de Nomenclatura

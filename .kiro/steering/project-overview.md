@@ -11,7 +11,7 @@ FrogBets é uma plataforma web **fechada** de apostas virtuais P2P para membros 
 - **Backend:** ASP.NET Core 8 (C#), REST API, JWT Bearer
 - **Frontend:** React 18 + TypeScript + Vite + Axios
 - **Banco:** PostgreSQL 16 via Entity Framework Core 8
-- **Testes:** xUnit + FsCheck (property-based testing)
+- **Testes:** xUnit + FsCheck (property-based testing) + Vitest + Cypress
 - **Deploy:** Docker Compose / AWS ECS Fargate
 
 ## Estrutura do Repositório
@@ -21,11 +21,15 @@ src/
   FrogBets.Api/          # Controllers + Services (lógica de negócio)
   FrogBets.Domain/       # Entidades e enums (sem dependências externas)
   FrogBets.Infrastructure/ # DbContext + Migrations EF Core
+tests/
+  FrogBets.Tests/        # Testes unitários e property-based (xUnit + FsCheck)
+  FrogBets.IntegrationTests/ # Testes de integração com WebApplicationFactory
 frontend/src/
   api/                   # Cliente Axios + endpoints
-  components/            # Navbar, ProtectedRoute
-  pages/                 # Páginas da aplicação
-tests/FrogBets.Tests/    # Testes unitários e property-based
+  components/            # Navbar, ProtectedRoute, CoinIcon
+  pages/                 # Páginas da aplicação (15 páginas)
+  test/                  # Setup de testes (Vitest + MSW)
+frontend/cypress/        # Testes E2E (Cypress)
 docs/                    # Documentação técnica
 ```
 

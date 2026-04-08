@@ -9,10 +9,11 @@ inclusion: always
 ### Estrutura de um Controller
 
 - Controllers ficam em `src/FrogBets.Api/Controllers/`
-- Cada controller injeta apenas interfaces de serviço (nunca `DbContext` diretamente, exceto `LeaderboardController` e `UsersController` que são simples queries)
-- Verificação de admin via claim: `User.FindFirstValue("isAdmin") == "true"`
+- Cada controller injeta apenas interfaces de serviço (nunca `DbContext` diretamente, exceto `LeaderboardController`, `UsersController` e `MapResultsController` que são simples queries)
+- Verificação de admin via claim: `User.FindFirstValue("isAdmin") == "true"` — ou via banco (`IsAdminFromDb()`) para operações críticas
 - Verificação de líder de time: consulta ao banco (não via claim, pois `IsTeamLeader` pode mudar sem novo login)
 - Extração do userId autenticado: `User.FindFirstValue(ClaimTypes.NameIdentifier)`
+- **MasterAdmin:** configurado via `MasterAdminUsername` no `appsettings.json` — único que não pode ser rebaixado
 
 ### Estrutura de um Service
 
@@ -55,6 +56,10 @@ inclusion: always
 | `SAME_TEAM_TRADE` | Membros do mesmo time |
 | `OFFER_NOT_PENDING` | Oferta não está pendente |
 | `ALREADY_LISTED` | Membro já está na lista de trocas |
+| `MAP_GAME_NOT_FOUND` | Jogo não encontrado ao registrar resultado de mapa |
+| `INVALID_MAP_NUMBER` | Número do mapa inválido |
+| `INVALID_ROUNDS_COUNT` | Número de rounds inválido |
+| `MAP_ALREADY_REGISTERED` | Mapa já registrado para este jogo |
 
 ### Adicionando uma nova entidade
 
@@ -97,6 +102,12 @@ var options = new DbContextOptionsBuilder<FrogBetsDbContext>()
     .Options;
 ```
 
+### Padrão de teste de integração (xUnit + WebApplicationFactory)
+
+- Ficam em `tests/FrogBets.IntegrationTests/`
+- Usam `WebApplicationFactory<Program>` com banco InMemory
+- Cobrem o fluxo HTTP completo (controller → service → banco)
+
 ### Padrão de property-based test (FsCheck)
 
 ```csharp
@@ -113,6 +124,19 @@ public Property NomeDaPropriedade()
 
 Cada spec deve ter seus property-tests cobrindo todas as propriedades de corretude definidas no `design.md`.
 
+### Testes Frontend (Vitest + Testing Library + MSW)
+
+- Ficam em `frontend/src/pages/*.test.tsx` e `frontend/src/components/*.test.tsx`
+- Setup em `frontend/src/test/setup.ts`
+- Usar MSW para mockar chamadas de API
+- Rodar com `npm run test` (já configurado com `--run` no package.json)
+
+### Testes E2E (Cypress)
+
+- Ficam em `frontend/cypress/e2e/`
+- Rodar com `npm run test:e2e` (headless) ou `npm run test:e2e:open` (interativo)
+- Suporte em `frontend/cypress/support/`
+
 ## Regras de Qualidade — Obrigatórias
 
 **Nunca fazer commit sem antes rodar e garantir que todos os testes passam.**
@@ -120,10 +144,16 @@ Cada spec deve ter seus property-tests cobrindo todas as propriedades de corretu
 ```powershell
 # Antes de qualquer commit, rodar:
 dotnet test --configuration Release --verbosity quiet
-cd frontend && npm run test -- --run
+cd frontend && npm run test
 ```
 
-Todos os 245 testes .NET devem passar. Zero falhas é o único estado aceitável para commit.
+**Nunca commitar código TypeScript com erros de tipo.** O build da imagem Docker roda `tsc -b` e falha com código 2 se houver erros TS. Verificar antes:
+
+```powershell
+cd frontend && npx tsc --noEmit
+```
+
+Todos os testes .NET devem passar. Zero falhas é o único estado aceitável para commit.
 
 ## Deploy e Infraestrutura
 

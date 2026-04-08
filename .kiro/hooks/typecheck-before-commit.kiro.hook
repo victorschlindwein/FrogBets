@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "name": "TypeCheck Frontend Before Commit",
+  "description": "Roda tsc --noEmit no frontend antes de commitar para evitar erros de tipo quebrarem o build da imagem Docker",
+  "version": "1",
+  "when": {
+    "type": "preToolUse",
+    "toolTypes": [
+      "shell"
+    ]
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "cd frontend && npx tsc --noEmit",
+    "timeout": 60
+  }
+}

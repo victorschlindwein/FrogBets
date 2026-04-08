@@ -18,8 +18,9 @@ WinsCount, LossesCount, TeamId (nullable), IsTeamLeader, CreatedAt
 
 **Papéis:**
 - Usuário comum: pode criar e cobrir apostas
-- Admin (`IsAdmin = true`): gerencia jogos, convites, times, jogadores
+- Admin (`IsAdmin = true`): gerencia jogos, convites, times, jogadores, logs de auditoria
 - Líder de time (`IsTeamLeader = true`): gerencia marketplace de trocas do seu time
+- Master Admin (`MasterAdminUsername` no config): único que pode promover/revogar outros admins; não pode ser rebaixado
 
 ### Game → Market → Bet (hierarquia central)
 
@@ -73,6 +74,27 @@ TradeOffer: OfferedUserId, TargetUserId, ProposerTeamId, ReceiverTeamId, Status 
 ### RevokedToken
 JTI de tokens JWT revogados (logout). Limpeza periódica por `ExpiresAt`.
 
+### AuditLog
+Registro de ações administrativas e operações sensíveis.
+
+```csharp
+Id, ActorId (nullable), Username, Action, ResourceType, ResourceId,
+StatusCode, Details (truncado a 1000 chars), OccurredAt
+```
+
+- Limpeza automática via `AuditLogCleanupService` (background service)
+- Retenção configurável via `AUDIT_LOG_RETENTION_DAYS` (padrão: 90 dias)
+
+### MapResult
+Resultado de um mapa específico de uma partida.
+
+```csharp
+Id, GameId, MapNumber, Rounds, CreatedAt
+```
+
+- Relacionado a `MatchStats[]` dos jogadores naquele mapa
+- Validações: número do mapa deve ser válido para o jogo, rounds > 0, mapa não pode ser registrado duas vezes
+
 ## Enums
 
 ```csharp
@@ -96,3 +118,5 @@ TradeOfferStatus: Pending, Accepted, Rejected, Cancelled
 7. **Convite:** o token é marcado como usado apenas após o usuário ser criado com sucesso.
 8. **Líder único:** cada time pode ter no máximo um líder ativo. Designar novo líder remove o anterior.
 9. **Remoção de time:** ao mover um usuário de time, `IsTeamLeader` é automaticamente removido e o `TradeListing` é cancelado.
+10. **Master Admin:** configurado via `MasterAdminUsername` no `appsettings.json`. Não pode ser rebaixado por outros admins. Apenas o master admin pode promover/revogar outros admins.
+11. **Resultado de mapa:** cada mapa de um jogo só pode ter um resultado registrado. O número do mapa deve ser válido (entre 1 e `NumberOfMaps` do jogo).

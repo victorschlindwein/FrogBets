@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import apiClient from '../api/client'
 import { getTeams, createTeam, CS2Team, getPlayers, CS2Player, getGamePlayers, registerMatchStats, createMapResult, getMapResultsByGame, MapResult } from '../api/players'
 
-interface User { id: string; username: string; isAdmin: boolean; isMasterAdmin?: boolean; teamId?: string | null; isTeamLeader?: boolean }
+interface User { id: string; username: string; isAdmin: boolean; isMasterAdmin?: boolean; teamId?: string | null; teamName?: string | null; isTeamLeader?: boolean }
 interface Invite {
   id: string; token: string; description: string | null
   expiresAt: string; createdAt: string; status: 'Pending' | 'Used' | 'Expired'
@@ -108,7 +108,7 @@ function UsersSection({ currentUser, teams }: { currentUser: User; teams: CS2Tea
                   </td>
                   <td>{u.isAdmin ? '✅' : '—'}</td>
                   <td>{u.isTeamLeader ? '✅' : '—'}</td>
-                  <td>{u.teamId ? (teamNameById[u.teamId] ?? u.teamId) : '—'}</td>
+                  <td>{u.teamName ?? '—'}</td>
                 </tr>
               ))}
             </tbody>

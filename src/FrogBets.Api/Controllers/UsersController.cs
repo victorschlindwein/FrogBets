@@ -106,7 +106,7 @@ public class UsersController : ControllerBase
         }
     }
 
-    /// <summary>GET /api/users — admin: list all users with id, username, isAdmin, teamId.</summary>
+    /// <summary>GET /api/users — admin: list all users with id, username, isAdmin, teamId, teamName.</summary>
     [HttpGet]
     [Authorize]
     public async Task<IActionResult> ListUsers()
@@ -123,6 +123,7 @@ public class UsersController : ControllerBase
                 isAdmin      = u.IsAdmin,
                 isTeamLeader = u.IsTeamLeader,
                 teamId       = u.TeamId,
+                teamName     = u.Team != null && !u.Team.IsDeleted ? u.Team.Name : null,
                 createdAt    = u.CreatedAt,
             })
             .ToListAsync();

@@ -1,6 +1,22 @@
 # 🐸 FrogBets
 
-Plataforma de apostas virtuais para partidas de CS2 entre amigos. Os usuários apostam saldo virtual uns contra os outros em mercados criados por administradores, acompanham o placar no leaderboard e disputam o ranking de jogadores com base em performance real nas partidas.
+Plataforma de apostas virtuais P2P para partidas de CS2 entre amigos. Saldo fictício, sem dinheiro real — serve como métrica de desempenho e diversão.
+
+---
+
+## Índice
+
+- [O Problema que Resolve](#o-problema-que-resolve)
+- [Visão Geral da Arquitetura](#visão-geral-da-arquitetura)
+- [Funcionalidades](#funcionalidades)
+- [Stack](#stack)
+- [Como Executar](#como-executar)
+- [Primeiro Acesso](#primeiro-acesso)
+- [Testes](#testes)
+- [Estrutura do Projeto](#estrutura-do-projeto)
+- [Deploy](#deploy)
+- [Como Contribuir](#como-contribuir)
+- [Documentação](#documentação)
 
 ---
 
@@ -9,45 +25,90 @@ Plataforma de apostas virtuais para partidas de CS2 entre amigos. Os usuários a
 Grupos de amigos que jogam CS2 juntos não têm uma forma simples de:
 - Apostar saldo fictício entre si em partidas reais
 - Acompanhar quem está ganhando mais apostas ao longo do tempo
-- Ter um ranking de performance individual baseado em estatísticas reais de jogo (estilo HLTV Rating 2.0)
+- Ter um ranking de performance individual baseado em estatísticas reais (estilo HLTV Rating 2.0)
 - Controlar o acesso à plataforma via convites
 
-O FrogBets resolve tudo isso em uma aplicação web self-hosted, sem dinheiro real envolvido.
+O FrogBets resolve tudo isso em uma aplicação web self-hosted.
+
+---
+
+## Visão Geral da Arquitetura
+
+O sistema é composto por três containers principais:
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                              FrogBets                                        │
+│                                                                              │
+│  ┌─────────────────────┐   HTTP/JSON    ┌──────────────────────────────────┐ │
+│  │                     │   + JWT Bearer │                                  │ │
+│  │   React SPA         │ ─────────────► │   ASP.NET Core 8 Web API         │ │
+│  │                     │               │                                  │ │
+│  │  React 18           │               │  REST API · JWT Auth             │ │
+│  │  TypeScript + Vite  │               │  EF Core 8 · Porta 8080          │ │
+│  │  Axios              │               │                                  │ │
+│  │  Porta 8080 (nginx) │               └──────────────────────────────────┘ │
+│  └─────────────────────┘                              │                      │
+│                                                       │ EF Core              │
+│                                                       ▼                      │
+│                                      ┌──────────────────────────────────┐    │
+│                                      │        PostgreSQL 16             │    │
+│                                      │        Porta 5432                │    │
+│                                      └──────────────────────────────────┘    │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+Em produção (AWS ECS Fargate):
+
+```
+Internet
+    │
+    ▼
+AWS ALB (porta 80/443)
+    ├── /api/*  ──► ECS Task: frogbets-api      (porta 8080)
+    └── /*      ──► ECS Task: frogbets-frontend  (porta 8080, nginx-unprivileged)
+                                                        │
+                                                AWS RDS PostgreSQL
+```
+
+> Modelo C4 completo (Context, Containers, Components, Code) em [docs/C4.md](docs/C4.md).
 
 ---
 
 ## Funcionalidades
 
 ### Apostas P2P
-- Qualquer usuário autenticado pode criar uma aposta em um mercado aberto, escolhendo uma opção e um valor
-- Outros usuários cobrem apostas pendentes — a opção do cobrador é sempre o oposto da do criador (atribuída automaticamente)
-- Ao criar ou cobrir uma aposta, o valor é movido de `VirtualBalance` para `ReservedBalance` — o saldo total nunca muda
+- Usuários criam apostas em mercados abertos escolhendo uma opção e um valor
+- Outros usuários cobrem apostas pendentes — a opção do cobrador é sempre o oposto (atribuída automaticamente)
+- Ao criar ou cobrir, o valor sai de `VirtualBalance` e vai para `ReservedBalance` — o total nunca muda
 - Apostas pendentes podem ser canceladas pelo criador antes de serem cobertas
-- Marketplace: lista todas as apostas pendentes de outros usuários disponíveis para cobertura
+- Marketplace lista todas as apostas pendentes disponíveis para cobertura
 
 ### Jogos e Mercados
-- Admins criam jogos (séries de CS2) informando os times, data e número de mapas
-- Ao criar um jogo com N mapas, o sistema gera automaticamente todos os mercados: N × {Vencedor do Mapa, Top Kills, Mais Mortes, Maior Dano por Utilitários} + 1 × Vencedor da Série
-- Admin inicia o jogo (mercados ficam fechados para novas apostas) e registra os resultados por mercado
-- Ao registrar um resultado, todas as apostas ativas do mercado são liquidadas automaticamente: vencedor recebe 2× o valor apostado, perdedor perde o valor reservado
+- Admins criam jogos (séries de CS2) com times, data e número de mapas
+- Ao criar um jogo com N mapas, o sistema gera automaticamente:
+  - N × {Vencedor do Mapa, Top Kills, Mais Mortes, Maior Dano por Utilitários}
+  - 1 × Vencedor da Série
+- Admin inicia o jogo (mercados fecham para novas apostas) e registra resultados por mercado
+- Ao registrar um resultado, todas as apostas ativas são liquidadas: vencedor recebe 2× o valor, perdedor perde o reservado
 
 ### Leaderboard
 - Ranking de apostadores por saldo virtual acumulado
-- Exibe saldo disponível, saldo reservado, vitórias e derrotas de cada usuário
+- Exibe saldo disponível, reservado, vitórias e derrotas
 
-### Sistema de Rating de Jogadores (CS2)
+### Rating de Jogadores (CS2)
 - Admins cadastram times e jogadores de CS2
-- Para cada partida, o admin registra o `MapResult` (mapa + número de rounds) e depois as estatísticas individuais de cada jogador naquele mapa (kills, deaths, assists, dano total, KAST%)
-- O rating é calculado por mapa usando a fórmula HLTV Rating 2.0 adaptada e acumulado no `PlayerScore` do jogador
+- Para cada partida, o admin registra o `MapResult` e as estatísticas individuais (kills, deaths, assists, dano, KAST%)
+- Rating calculado por mapa usando a fórmula HLTV Rating 2.0 adaptada e acumulado no `PlayerScore`
 - Ranking público de jogadores por performance
 
 ### Times e Marketplace de Trocas
-- Cada usuário pode pertencer a um time, com papel de líder de time
-- Líderes podem marcar membros como disponíveis para troca e criar/aceitar ofertas entre times
-- Admins podem realizar trocas diretas sem necessidade de oferta formal
+- Cada usuário pode pertencer a um time, com papel de líder
+- Líderes marcam membros como disponíveis para troca e criam/aceitam ofertas entre times
+- Admins realizam trocas diretas sem necessidade de oferta formal
 
 ### Acesso e Segurança
-- Plataforma fechada por convite — o único caminho para criar conta é via token de convite gerado por admin
+- Plataforma fechada por convite — único caminho para criar conta é via token gerado por admin
 - JWT com expiração de 60 minutos e logout real (token adicionado à blocklist)
 - Rate limiting nos endpoints de autenticação (5 tentativas por 15 minutos por IP)
 - Auditoria automática de todas as operações de escrita
@@ -78,18 +139,6 @@ O FrogBets resolve tudo isso em uma aplicação web self-hosted, sem dinheiro re
 
 ---
 
-## Pré-requisitos
-
-- [Docker](https://docs.docker.com/get-docker/) e [Docker Compose](https://docs.docker.com/compose/install/)
-- Git
-
-Para desenvolvimento local sem Docker:
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- [Node.js 20+](https://nodejs.org/)
-- PostgreSQL 16 rodando localmente
-
----
-
 ## Como Executar
 
 ### Com Docker (recomendado)
@@ -100,12 +149,10 @@ Para desenvolvimento local sem Docker:
    cd frogbets
    ```
 
-2. Copie o arquivo de variáveis de ambiente:
+2. Copie e preencha as variáveis de ambiente:
    ```bash
    cp .env.example .env
    ```
-
-3. Edite o `.env` e preencha os valores:
    ```env
    POSTGRES_PASSWORD=sua_senha_segura
    JWT_KEY=gere_uma_chave_com_minimo_32_chars
@@ -115,16 +162,16 @@ Para desenvolvimento local sem Docker:
    openssl rand -base64 32
    ```
 
-4. Suba os containers:
+3. Suba os containers:
    ```bash
    docker compose up -d
    ```
 
-5. Acesse:
+4. Acesse:
    - Frontend: http://localhost:3000
    - API: http://localhost:8080
 
-As migrações do banco de dados são aplicadas automaticamente na inicialização da API.
+As migrações são aplicadas automaticamente na inicialização da API.
 
 ---
 
@@ -132,7 +179,6 @@ As migrações do banco de dados são aplicadas automaticamente na inicializaç�
 
 **Backend:**
 ```bash
-# Configure a connection string no appsettings.Development.json ou via variável de ambiente
 cd src/FrogBets.Api
 dotnet run
 ```
@@ -148,20 +194,14 @@ npm run dev
 
 ## Primeiro Acesso
 
-A plataforma usa um sistema de convites. Para criar o primeiro usuário administrador, insira um registro diretamente no banco:
+A plataforma usa um sistema de convites. Para criar o primeiro usuário administrador, insira diretamente no banco:
 
 ```sql
 INSERT INTO "Users" ("Id", "Username", "PasswordHash", "IsAdmin", "VirtualBalance", "ReservedBalance", "WinsCount", "LossesCount", "CreatedAt", "IsTeamLeader")
 VALUES (gen_random_uuid(), 'admin', '<bcrypt_hash>', true, 10000, 0, 0, 0, now(), false);
 ```
 
-Para gerar o hash BCrypt da senha, use o utilitário incluso:
-```bash
-# Crie um projeto temporário ou use o dotnet-script
-# O hash deve ser gerado com BCrypt.Net-Next, work factor 11
-```
-
-Após isso, use o painel admin para gerar convites para os demais usuários.
+O hash BCrypt deve ser gerado com `BCrypt.Net-Next`, work factor 11. Após isso, use o painel admin para gerar convites para os demais usuários.
 
 ---
 
@@ -184,15 +224,14 @@ npm run test -- --run
 
 ### E2E com Cypress
 
-Veja a seção completa em [docs/TECHNICAL.md — Testes E2E com Cypress](docs/TECHNICAL.md#testes-e2e-com-cypress).
-
-Resumo rápido:
 ```bash
 # Com a aplicação rodando localmente (frontend em :5173, API em :8080)
 cd frontend
 npx cypress open    # interface interativa
 npx cypress run     # headless (CI)
 ```
+
+> Instruções completas em [docs/TECHNICAL.md](docs/TECHNICAL.md#testes-e2e-com-cypress).
 
 ---
 
@@ -201,32 +240,23 @@ npx cypress run     # headless (CI)
 ```
 frogbets/
 ├── src/
-│   ├── FrogBets.Api/          # Controllers, Services, configuração ASP.NET
-│   │   ├── Controllers/       # AuthController, BetsController, GamesController, ...
-│   │   └── Services/          # AuthService, BetService, SettlementService, ...
-│   ├── FrogBets.Domain/       # Entidades e enums de domínio
-│   │   ├── Entities/          # User, Game, Market, Bet, CS2Player, CS2Team, ...
-│   │   └── Enums/             # BetStatus, GameStatus, MarketType, ...
+│   ├── FrogBets.Api/            # Controllers, Services, configuração ASP.NET
+│   ├── FrogBets.Domain/         # Entidades e enums de domínio
 │   └── FrogBets.Infrastructure/ # DbContext, migrações EF Core
-│       ├── Data/              # FrogBetsDbContext
-│       └── Migrations/        # Migrações EF Core
-├── frontend/
-│   └── src/
-│       ├── api/               # Cliente HTTP (Axios) + endpoints de players
-│       ├── components/        # Navbar, ProtectedRoute
-│       └── pages/             # Login, Register, Dashboard, Games, Bets, ...
-├── tests/
-│   └── FrogBets.Tests/        # Testes unitários, integração e property-based
-│       └── Integration/       # Testes de integração com WebApplicationFactory
-├── infra/                     # Scripts de infraestrutura AWS
+├── frontend/src/
+│   ├── api/                     # Cliente HTTP (Axios) + endpoints
+│   ├── components/              # Navbar, ProtectedRoute
+│   └── pages/                   # Login, Dashboard, Games, Bets, ...
+├── tests/FrogBets.Tests/        # Testes unitários, integração e property-based
+├── infra/                       # Scripts de infraestrutura AWS
 ├── docs/
-│   ├── TECHNICAL.md           # Documentação técnica detalhada
-│   ├── C4.md                  # Modelo C4 de arquitetura (Context, Containers, Components, Code)
-│   └── ADR.md                 # Architecture Decision Records
+│   ├── TECHNICAL.md             # Documentação técnica detalhada
+│   ├── C4.md                    # Modelo C4 de arquitetura
+│   └── ADR.md                   # Architecture Decision Records
 ├── docker-compose.yml
 ├── Dockerfile.api
 ├── Dockerfile.frontend
-├── DEPLOY.md                  # Guia de deploy AWS ECS Fargate
+├── DEPLOY.md                    # Guia de deploy AWS ECS Fargate
 └── nginx.conf
 ```
 
@@ -240,38 +270,45 @@ A aplicação roda em produção na AWS ECS Fargate com Application Load Balance
 2. Build e push das imagens Docker para ECR
 3. Deploy rolling update nos serviços ECS
 
-Veja [DEPLOY.md](DEPLOY.md) para instruções completas de setup da infraestrutura.
+> Instruções completas de setup da infraestrutura em [DEPLOY.md](DEPLOY.md).
 
 ---
 
 ## Como Contribuir
 
-Contribuições são bem-vindas. Siga o fluxo abaixo:
-
-1. Faça um fork do repositório
-2. Crie uma branch para sua feature ou correção:
+1. Faça um fork e crie uma branch:
    ```bash
    git checkout -b feat/minha-feature
-   # ou
-   git checkout -b fix/meu-bugfix
    ```
-3. Faça suas alterações com commits descritivos
-4. **Rode os testes antes de commitar** — zero falhas é obrigatório:
+
+2. Faça suas alterações com commits descritivos.
+
+3. Rode os testes antes de commitar — zero falhas é obrigatório:
    ```bash
    dotnet test --configuration Release --verbosity quiet
    cd frontend && npm run test -- --run
    ```
-5. Abra um Pull Request descrevendo o que foi feito e por quê
+
+4. Abra um Pull Request descrevendo o que foi feito e por quê.
 
 ### Convenções
-
-- Commits em português ou inglês, mas seja consistente no PR
 - Código C# segue as convenções padrão do .NET (PascalCase para membros públicos)
 - Código TypeScript/React segue o estilo existente (componentes funcionais, hooks)
 - Adicione testes para novas funcionalidades sempre que possível
 
 ---
 
+## Documentação
+
+| Documento | Conteúdo |
+|---|---|
+| [docs/TECHNICAL.md](docs/TECHNICAL.md) | Endpoints, serviços, entidades, migrações, testes E2E |
+| [docs/C4.md](docs/C4.md) | Modelo C4 de arquitetura (Context, Containers, Components, Code) |
+| [docs/ADR.md](docs/ADR.md) | Architecture Decision Records |
+| [DEPLOY.md](DEPLOY.md) | Setup completo de infraestrutura AWS ECS Fargate |
+
+---
+
 ## Licença
 
-Este projeto é de uso pessoal/privado entre amigos. Sem licença de distribuição definida.
+Uso pessoal/privado entre amigos. Sem licença de distribuição definida.

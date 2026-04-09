@@ -27,6 +27,9 @@ appsettings.*.json
 !.env.example
 infra/.tmp/
 
+# Local admin seed (contains password hashes)
+insert_admin.sql
+
 # Local docs (not for version control)
 docs/DNS-ROUTE53.md
 

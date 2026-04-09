@@ -108,8 +108,8 @@ async function setupApiClientMock() {
 }
 
 async function renderAdminPage() {
-  const { default: AdminPage } = await import('./AdminPage')
-  return render(<AdminPage />)
+  const { default: GameManagementPage } = await import('./GameManagementPage')
+  return render(<GameManagementPage />)
 }
 
 async function waitForAdminPageToLoad() {
@@ -159,7 +159,7 @@ describe('Preservation: MatchStatsSection — comportamento fora da bug conditio
     }, { timeout: 3000 })
 
     // Selecionar o mapa para revelar o dropdown de Jogador
-    const mapSelect = document.getElementById('statsMapResultSelect') as HTMLSelectElement
+    const mapSelect = document.getElementById('statsMapSelect') as HTMLSelectElement
     expect(mapSelect).not.toBeNull()
     await userEvent.selectOptions(mapSelect, 'map1')
 
@@ -194,7 +194,7 @@ describe('Preservation: MatchStatsSection — comportamento fora da bug conditio
 
     // Mensagem de "nenhum mapa" deve aparecer
     await waitFor(() => {
-      expect(screen.getByText(/Nenhum mapa registrado para este jogo\./i)).toBeInTheDocument()
+      expect(screen.getByText(/Nenhum mapa registrado — registre o mapa na Etapa 2 primeiro\./i)).toBeInTheDocument()
     }, { timeout: 3000 })
   })
 
@@ -216,7 +216,7 @@ describe('Preservation: MatchStatsSection — comportamento fora da bug conditio
     // Sem selecionar jogo, o select de Mapa não deve existir
     expect(document.getElementById('statsMapResultSelect')).toBeNull()
     // E a mensagem de "nenhum mapa" também não deve aparecer
-    expect(screen.queryByText(/Nenhum mapa registrado para este jogo\./i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Nenhum mapa registrado — registre o mapa na Etapa 2 primeiro\./i)).not.toBeInTheDocument()
   })
 
   it('3.5 Both Fail: ambas as chamadas falham → mapResults=[] e players=[] (mensagem "Nenhum mapa" aparece)', async () => {
@@ -245,11 +245,11 @@ describe('Preservation: MatchStatsSection — comportamento fora da bug conditio
 
     // Com ambas as chamadas falhando, mapResults=[] → mensagem de "nenhum mapa"
     await waitFor(() => {
-      expect(screen.getByText(/Nenhum mapa registrado para este jogo\./i)).toBeInTheDocument()
+      expect(screen.getByText(/Nenhum mapa registrado — registre o mapa na Etapa 2 primeiro\./i)).toBeInTheDocument()
     }, { timeout: 3000 })
 
     // O select de Mapa não deve aparecer (mapResults está vazio)
-    expect(document.getElementById('statsMapResultSelect')).toBeNull()
+    expect(document.getElementById('statsMapSelect')).toBeNull()
   })
 
 })

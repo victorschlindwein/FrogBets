@@ -105,12 +105,12 @@ async function setupApiClientMock() {
 }
 
 async function renderAdminPage() {
-  const { default: AdminPage } = await import('./AdminPage')
-  return render(<AdminPage />)
+  const { default: GameManagementPage } = await import('./GameManagementPage')
+  return render(<GameManagementPage />)
 }
 
 async function waitForAdminPageToLoad() {
-  // Aguarda o AdminPage sair do estado "Carregando..."
+  // Aguarda o GameManagementPage sair do estado "Carregando..."
   await waitFor(() => {
     expect(screen.queryByText('Carregando...')).not.toBeInTheDocument()
   }, { timeout: 5000 })

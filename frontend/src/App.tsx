@@ -8,6 +8,7 @@ import BetsPage from './pages/BetsPage'
 import MarketplacePage from './pages/MarketplacePage'
 import LeaderboardPage from './pages/LeaderboardPage'
 import AdminPage from './pages/AdminPage'
+import GameManagementPage from './pages/GameManagementPage'
 import PlayersRankingPage from './pages/PlayersRankingPage'
 import TeamsPage from './pages/TeamsPage'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -28,6 +29,7 @@ function App() {
           <Route path="/players/ranking" element={<PlayersRankingPage />} />
           <Route path="/teams" element={<TeamsPage />} />
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin/games" element={<GameManagementPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

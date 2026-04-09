@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import apiClient from '../api/client'
-import { getTeams, createTeam, CS2Team, getPlayers, CS2Player, getGamePlayers, registerMatchStats, createMapResult, getMapResultsByGame, MapResult } from '../api/players'
+import { getTeams, createTeam, CS2Team, getPlayers, CS2Player } from '../api/players'
 
 interface User { id: string; username: string; isAdmin: boolean; isMasterAdmin?: boolean; teamId?: string | null; teamName?: string | null; isTeamLeader?: boolean }
 interface Invite {
@@ -28,13 +29,9 @@ const NAV_ITEMS_BASE = [
   { id: 'sec-games',       label: '🎮 Cadastrar Jogo' },
   { id: 'sec-edit-game',   label: '✏️ Editar Jogo' },
   { id: 'sec-delete-game', label: '🗑️ Excluir Jogo' },
-  { id: 'sec-start',       label: '▶️ Iniciar Jogo' },
-  { id: 'sec-result',      label: '🏁 Registrar Resultado' },
   { id: 'sec-invites',     label: '🎟️ Convites' },
   { id: 'sec-teams',       label: '🛡️ Times' },
   { id: 'sec-players',     label: '👤 Jogadores' },
-  { id: 'sec-map-results', label: '📍 Mapas' },
-  { id: 'sec-stats',       label: '📊 Estatísticas' },
   { id: 'sec-leaders',     label: '👑 Gestão de Líderes' },
   { id: 'sec-swap',        label: '🔄 Troca Direta' },
 ]
@@ -287,206 +284,6 @@ function CreateGameForm({ teams, onCreated }: { teams: CS2Team[]; onCreated: () 
           {error && <p role="alert">{error}</p>}
         </form>
       </div>
-    </section>
-  )
-}
-
-// ── Iniciar Jogo ──────────────────────────────────────────────────────────
-function StartGameSection({ games, onStarted }: { games: Game[]; onStarted: () => void }) {
-  const [selectedGameId, setSelectedGameId] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [success, setSuccess] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const scheduledGames = games.filter(g => g.status === 'Scheduled')
-
-  async function handleStart(e: React.FormEvent) {
-    e.preventDefault()
-    if (!selectedGameId) return
-    setSubmitting(true); setSuccess(null); setError(null)
-    try {
-      await apiClient.patch(`/games/${selectedGameId}/start`)
-      setSuccess('Jogo iniciado com sucesso!')
-      setSelectedGameId('')
-      onStarted()
-    } catch (err: unknown) {
-      const e2 = err as { response?: { data?: { error?: { message?: string } } } }
-      setError(e2.response?.data?.error?.message ?? 'Erro ao iniciar jogo.')
-    } finally { setSubmitting(false) }
-  }
-
-  return (
-    <section id="sec-start">
-      <h2>▶️ Iniciar Jogo</h2>
-      {scheduledGames.length === 0 ? (
-        <div className="card empty-card"><p>Nenhum jogo agendado disponível para iniciar.</p></div>
-      ) : (
-        <div className="card">
-          <form onSubmit={handleStart}>
-            <div className="form-group">
-              <label htmlFor="startGameSelect">Selecionar Jogo:</label>
-              <select id="startGameSelect" value={selectedGameId} onChange={e => setSelectedGameId(e.target.value)} required>
-                <option value="">Selecione um jogo</option>
-                {scheduledGames.map(g => (
-                  <option key={g.id} value={g.id}>{g.teamA} vs {g.teamB} — {new Date(g.scheduledAt).toLocaleString('pt-BR')}</option>
-                ))}
-              </select>
-            </div>
-            <button type="submit" disabled={submitting || !selectedGameId}>{submitting ? 'Iniciando...' : 'Iniciar Jogo'}</button>
-            {success && <p role="status">{success}</p>}
-            {error && <p role="alert">{error}</p>}
-          </form>
-        </div>
-      )}
-    </section>
-  )
-}
-
-// ── Registrar Resultado (sem seleção de mercado — registra por jogo) ──────
-function RegisterResultSection({ games }: { games: Game[] }) {
-  const [selectedGameId, setSelectedGameId] = useState('')
-  const [markets, setMarkets] = useState<Market[]>([])
-  const [gamePlayers, setGamePlayers] = useState<import('../api/players').GamePlayer[]>([])
-  const [results, setResults] = useState<Record<string, string>>({})
-  const [loadingMarkets, setLoadingMarkets] = useState(false)
-  const [loadingPlayers, setLoadingPlayers] = useState(false)
-  const [playersError, setPlayersError] = useState<string | null>(null)
-  const [submitting, setSubmitting] = useState(false)
-  const [success, setSuccess] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const activeGames = games.filter(g => g.status === 'InProgress')
-
-  const PLAYER_MARKETS = ['TopKills', 'MostDeaths', 'MostUtilityDamage']
-  const MARKET_ORDER: Record<string, number> = {
-    MapWinner: 0, SeriesWinner: 1, TopKills: 2, MostDeaths: 3, MostUtilityDamage: 4,
-  }
-
-  function sortMarkets(ms: Market[]): Market[] {
-    return [...ms].sort((a, b) => {
-      const typeDiff = (MARKET_ORDER[a.type] ?? 99) - (MARKET_ORDER[b.type] ?? 99)
-      if (typeDiff !== 0) return typeDiff
-      return (a.mapNumber ?? 0) - (b.mapNumber ?? 0)
-    })
-  }
-
-  useEffect(() => {
-    if (!selectedGameId) {
-      setMarkets([]); setResults({}); setGamePlayers([]); setPlayersError(null); return
-    }
-    setLoadingMarkets(true)
-    setLoadingPlayers(true)
-    setPlayersError(null)
-
-    apiClient.get<Game>(`/games/${selectedGameId}`)
-      .then(res => {
-        const closed = sortMarkets((res.data.markets ?? []).filter(m => m.status === 'Closed'))
-        setMarkets(closed)
-        setResults(Object.fromEntries(closed.map(m => [m.id, ''])))
-      })
-      .catch(() => setMarkets([]))
-      .finally(() => setLoadingMarkets(false))
-
-    import('../api/players').then(({ getGamePlayers }) =>
-      getGamePlayers(selectedGameId)
-        .then(setGamePlayers)
-        .catch(() => setPlayersError('Erro ao carregar jogadores.'))
-        .finally(() => setLoadingPlayers(false))
-    )
-  }, [selectedGameId])
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    const pending = markets.filter(m => results[m.id]?.trim())
-    if (pending.length === 0) { setError('Preencha ao menos um resultado.'); return }
-    setSubmitting(true); setSuccess(null); setError(null)
-    try {
-      await Promise.all(pending.map(m =>
-        apiClient.post(`/games/${selectedGameId}/results`, {
-          marketId: m.id,
-          winningOption: results[m.id].trim(),
-        })
-      ))
-      setSuccess(`${pending.length} resultado(s) registrado(s) com sucesso!`)
-      setSelectedGameId(''); setMarkets([]); setResults({}); setGamePlayers([])
-    } catch (err: unknown) {
-      const e2 = err as { response?: { data?: { error?: { message?: string } } } }
-      setError(e2.response?.data?.error?.message ?? 'Erro ao registrar resultado.')
-    } finally { setSubmitting(false) }
-  }
-
-  const selectedGame = activeGames.find(g => g.id === selectedGameId)
-
-  return (
-    <section id="sec-result">
-      <h2>🏁 Registrar Resultado</h2>
-      {activeGames.length === 0 ? (
-        <div className="card empty-card"><p>Nenhum jogo em andamento disponível.</p></div>
-      ) : (
-        <div className="card">
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label htmlFor="resultGameSelect">Selecionar Jogo:</label>
-              <select id="resultGameSelect" value={selectedGameId} onChange={e => setSelectedGameId(e.target.value)} required>
-                <option value="">Selecione um jogo</option>
-                {activeGames.map(g => (
-                  <option key={g.id} value={g.id}>{g.teamA} vs {g.teamB}</option>
-                ))}
-              </select>
-            </div>
-
-            {(loadingMarkets || loadingPlayers) && <p style={{ color: 'var(--text-muted)' }}>Carregando...</p>}
-
-            {!loadingMarkets && !loadingPlayers && selectedGameId && markets.length === 0 && (
-              <p style={{ color: 'var(--text-muted)' }}>Nenhum mercado fechado para este jogo.</p>
-            )}
-
-            {playersError && (
-              <p role="alert" style={{ color: 'var(--danger)' }}>{playersError}</p>
-            )}
-
-            {!loadingMarkets && !loadingPlayers && markets.length > 0 && (
-              <>
-                <p style={{ fontSize: '.85rem', color: 'var(--text-muted)', marginBottom: '.75rem' }}>
-                  Preencha a opção vencedora para cada mercado. Deixe em branco para pular.
-                </p>
-                {markets.map(m => (
-                  <div className="form-group" key={m.id}>
-                    <label>{marketLabel(m)}</label>
-                    {PLAYER_MARKETS.includes(m.type) ? (
-                      <select
-                        value={results[m.id] ?? ''}
-                        onChange={e => setResults(r => ({ ...r, [m.id]: e.target.value }))}
-                        disabled={gamePlayers.length === 0}
-                      >
-                        <option value="">— pular —</option>
-                        {gamePlayers.map(p => (
-                          <option key={p.id} value={p.username}>
-                            {p.username} ({p.teamName})
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <select value={results[m.id] ?? ''} onChange={e => setResults(r => ({ ...r, [m.id]: e.target.value }))}>
-                        <option value="">— pular —</option>
-                        <option value={selectedGame?.teamA}>{selectedGame?.teamA}</option>
-                        <option value={selectedGame?.teamB}>{selectedGame?.teamB}</option>
-                      </select>
-                    )}
-                  </div>
-                ))}
-                {!loadingPlayers && gamePlayers.length === 0 && !playersError && (
-                  <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>
-                    Nenhum jogador encontrado para este jogo — mercados de jogador desabilitados.
-                  </p>
-                )}
-                <button type="submit" disabled={submitting}>{submitting ? 'Registrando...' : 'Registrar Resultados'}</button>
-              </>
-            )}
-
-            {success && <p role="status">{success}</p>}
-            {error && <p role="alert">{error}</p>}
-          </form>
-        </div>
-      )}
     </section>
   )
 }
@@ -813,189 +610,6 @@ function PlayersSection({ teams, users, onUsersChange }: { teams: CS2Team[]; use
           </div>
         </div>
       )}
-    </section>
-  )
-}
-
-// ── Registrar Mapa ────────────────────────────────────────────────────────
-function MapResultSection({ games }: { games: Game[] }) {
-  const [gameId, setGameId] = useState('')
-  const [mapNumber, setMapNumber] = useState('1')
-  const [rounds, setRounds] = useState('1')
-  const [submitting, setSubmitting] = useState(false)
-  const [success, setSuccess] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  const eligibleGames = games.filter(g => g.status === 'InProgress' || g.status === 'Finished')
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!gameId) return
-    setSubmitting(true); setSuccess(null); setError(null)
-    try {
-      await createMapResult({ gameId, mapNumber: parseInt(mapNumber, 10), rounds: parseInt(rounds, 10) })
-      setSuccess('Mapa registrado com sucesso!')
-      setGameId(''); setMapNumber('1'); setRounds('1')
-    } catch (err: unknown) {
-      const e2 = err as { response?: { data?: { error?: { message?: string } } } }
-      setError(e2.response?.data?.error?.message ?? 'Erro ao registrar mapa.')
-    } finally { setSubmitting(false) }
-  }
-
-  return (
-    <section id="sec-map-results">
-      <h2>📍 Registrar Mapa</h2>
-      <div className="card">
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="mapResultGameSelect">Jogo:</label>
-            <select id="mapResultGameSelect" value={gameId} onChange={e => setGameId(e.target.value)} required>
-              <option value="">Selecione um jogo</option>
-              {eligibleGames.map(g => (
-                <option key={g.id} value={g.id}>{g.teamA} vs {g.teamB} — {g.status === 'InProgress' ? 'Em andamento' : 'Finalizado'}</option>
-              ))}
-            </select>
-          </div>
-          <div className="form-group">
-            <label htmlFor="mapNumber">Número do Mapa:</label>
-            <input id="mapNumber" type="number" min="1" value={mapNumber} onChange={e => setMapNumber(e.target.value)} required />
-          </div>
-          <div className="form-group">
-            <label htmlFor="mapRounds">Número de Rounds:</label>
-            <input id="mapRounds" type="number" min="1" value={rounds} onChange={e => setRounds(e.target.value)} required />
-          </div>
-          <button type="submit" disabled={submitting}>{submitting ? 'Registrando...' : 'Registrar Mapa'}</button>
-          {success && <p role="status">{success}</p>}
-          {error && <p role="alert">{error}</p>}
-        </form>
-      </div>
-    </section>
-  )
-}
-
-// ── Estatísticas de Partida ───────────────────────────────────────────────
-function MatchStatsSection({ games }: { games: Game[] }) {
-  const [players, setPlayers] = useState<{ id: string; username: string; teamName: string }[]>([])
-
-  // Etapa 1: selecionar jogo
-  const [statsGameId, setStatsGameId] = useState('')
-  // Etapa 2: mapResults carregados + seleção
-  const [mapResults, setMapResults] = useState<MapResult[]>([])
-  const [loadingMaps, setLoadingMaps] = useState(false)
-  const [mapResultId, setMapResultId] = useState('')
-  // Etapa 3: stats
-  const [playerId, setPlayerId] = useState('')
-  const [kills, setKills] = useState('0')
-  const [deaths, setDeaths] = useState('0')
-  const [assists, setAssists] = useState('0')
-  const [totalDamage, setTotalDamage] = useState('0')
-  const [kastPercent, setKastPercent] = useState('0')
-  const [submitting, setSubmitting] = useState(false)
-  const [success, setSuccess] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  const eligibleGames = games.filter(g => g.status === 'InProgress' || g.status === 'Finished')
-
-  useEffect(() => {
-    if (!statsGameId) { setMapResults([]); setMapResultId(''); setPlayers([]); return }
-    setLoadingMaps(true); setMapResultId('')
-    Promise.allSettled([
-      getMapResultsByGame(statsGameId),
-      getGamePlayers(statsGameId),
-    ]).then(([mapsResult, playersResult]) => {
-      setMapResults(mapsResult.status === 'fulfilled' ? mapsResult.value : [])
-      setPlayers(playersResult.status === 'fulfilled' ? playersResult.value : [])
-    }).finally(() => setLoadingMaps(false))
-  }, [statsGameId])
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!mapResultId || !playerId) return
-    setSubmitting(true); setSuccess(null); setError(null)
-    try {
-      await registerMatchStats(playerId, {
-        mapResultId,
-        kills: parseInt(kills, 10), deaths: parseInt(deaths, 10),
-        assists: parseInt(assists, 10), totalDamage: parseFloat(totalDamage),
-        kastPercent: parseFloat(kastPercent),
-      })
-      setSuccess('Estatísticas registradas com sucesso!')
-      setStatsGameId(''); setMapResults([]); setMapResultId('')
-      setPlayerId(''); setKills('0'); setDeaths('0')
-      setAssists('0'); setTotalDamage('0'); setKastPercent('0')
-    } catch (err: unknown) {
-      const e2 = err as { response?: { data?: { error?: { message?: string } } } }
-      setError(e2.response?.data?.error?.message ?? 'Erro ao registrar estatísticas.')
-    } finally { setSubmitting(false) }
-  }
-
-  return (
-    <section id="sec-stats">
-      <h2>📊 Estatísticas de Partida</h2>
-      <div className="card">
-        <form onSubmit={handleSubmit}>
-          {/* Etapa 1: Selecionar Jogo */}
-          <div className="form-group">
-            <label htmlFor="statsGameSelect">Jogo:</label>
-            <select id="statsGameSelect" value={statsGameId} onChange={e => setStatsGameId(e.target.value)} required>
-              <option value="">Selecione um jogo</option>
-              {eligibleGames.map(g => (
-                <option key={g.id} value={g.id}>{g.teamA} vs {g.teamB} — {g.status === 'InProgress' ? 'Em andamento' : 'Finalizado'}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Etapa 2: Selecionar MapResult */}
-          {statsGameId && (
-            <div className="form-group">
-              <label htmlFor="statsMapResultSelect">Mapa:</label>
-              {loadingMaps
-                ? <p style={{ color: 'var(--text-muted)' }}>Carregando mapas...</p>
-                : mapResults.length === 0
-                  ? <p style={{ color: 'var(--text-muted)', fontSize: '.9rem' }}>Nenhum mapa registrado para este jogo.</p>
-                  : <select id="statsMapResultSelect" value={mapResultId} onChange={e => setMapResultId(e.target.value)} required>
-                      <option value="">Selecione um mapa</option>
-                      {mapResults.map(mr => (
-                        <option key={mr.id} value={mr.id}>Mapa {mr.mapNumber} — {mr.rounds} rounds</option>
-                      ))}
-                    </select>
-              }
-            </div>
-          )}
-
-          {/* Etapa 3: Jogador e stats */}
-          {mapResultId && (
-            <>
-              <div className="form-group">
-                <label htmlFor="statsPlayerSelect">Jogador:</label>
-                <select id="statsPlayerSelect" value={playerId} onChange={e => setPlayerId(e.target.value)} required>
-                  <option value="">Selecione um jogador</option>
-                  {players.map(p => <option key={p.id} value={p.id}>{p.username} - {p.teamName}</option>)}
-                </select>
-              </div>
-              {[
-                { id: 'statsKills', label: 'Kills', val: kills, set: setKills, min: '0' },
-                { id: 'statsDeaths', label: 'Deaths', val: deaths, set: setDeaths, min: '0' },
-                { id: 'statsAssists', label: 'Assists', val: assists, set: setAssists, min: '0' },
-                { id: 'statsDamage', label: 'Dano Total', val: totalDamage, set: setTotalDamage, min: '0', step: '0.1' },
-                { id: 'statsKast', label: 'KAST (%)', val: kastPercent, set: setKastPercent, min: '0', max: '100', step: '0.1' },
-              ].map(f => (
-                <div className="form-group" key={f.id}>
-                  <label htmlFor={f.id}>{f.label}:</label>
-                  <input id={f.id} type="number" min={f.min} max={f.max} step={f.step ?? '1'}
-                    value={f.val} onChange={e => f.set(e.target.value)} required />
-                </div>
-              ))}
-            </>
-          )}
-
-          <button type="submit" disabled={submitting || !mapResultId || !playerId}>
-            {submitting ? 'Registrando...' : 'Registrar Estatísticas'}
-          </button>
-          {success && <p role="status">{success}</p>}
-          {error && <p role="alert">{error}</p>}
-        </form>
-      </div>
     </section>
   )
 }
@@ -1418,18 +1032,18 @@ export default function AdminPage() {
     <div className="page page-admin">
       <h1>⚙️ Administração</h1>
       <AdminNav isMasterAdmin={isMasterAdmin} />
+      <div className="card" style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <span>🎮 Para gerenciar partidas (iniciar, mapas, stats, resultados):</span>
+        <Link to="/admin/games" style={{ fontWeight: 600 }}>Ir para Gestão de Partidas →</Link>
+      </div>
       <UsersSection currentUser={user} />
       {isMasterAdmin && <AdminManagementSection users={users} currentUser={user} onUsersChange={loadUsers} />}
       <CreateGameForm teams={teams} onCreated={loadGames} />
       <DeleteGameSection games={games} onDeleted={loadGames} />
       <EditGameSection games={games} onUpdated={loadGames} />
-      <StartGameSection games={games} onStarted={loadGames} />
-      <RegisterResultSection games={games} />
       <InvitesSection />
       <TeamsSection onTeamsChange={setTeams} />
       <PlayersSection teams={teams} users={users} onUsersChange={loadUsers} />
-      <MapResultSection games={games} />
-      <MatchStatsSection games={games} />
       <LeaderManagementSection teams={teams} users={users} />
       <DirectSwapSection users={users} teams={teams} />
     </div>

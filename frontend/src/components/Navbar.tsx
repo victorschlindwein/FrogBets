@@ -49,6 +49,7 @@ export default function Navbar() {
         <Link to="/players/ranking" onClick={closeMenu}>Ranking CS2</Link>
         <Link to="/teams" onClick={closeMenu}>Times</Link>
         {me?.isAdmin && <Link to="/admin" onClick={closeMenu}>Admin</Link>}
+        {me?.isAdmin && <Link to="/admin/games" onClick={closeMenu}>Partidas</Link>}
         <span className="nav-spacer" />
         <span className="nav-user">{me?.username}</span>
         <button className="btn-orange" onClick={handleLogout} style={{ padding: '.4rem .9rem', fontSize: '.85rem' }}>Sair</button>

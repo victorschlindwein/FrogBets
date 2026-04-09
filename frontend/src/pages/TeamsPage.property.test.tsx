@@ -16,7 +16,7 @@ const arbTeam = fc.record({
 
 const arbMember = fc.record({
   id: fc.uuid(),
-  username: fc.string({ minLength: 1, maxLength: 15 }).filter(s => /\S/.test(s)),
+  username: fc.string({ minLength: 1, maxLength: 15 }).filter(s => s.trim().length > 0 && s === s.trim()),
   isTeamLeader: fc.boolean(),
 })
 

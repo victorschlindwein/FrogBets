@@ -26,34 +26,16 @@ builder.Services.AddCors(options =>
               .AllowAnyMethod()
               .AllowAnyHeader()));
 
-// Rate limiting — proteção contra brute force nos endpoints de auth (desabilitado em Testing)
-if (!builder.Environment.IsEnvironment("Testing"))
+// Rate limiting removido — causava problemas com múltiplos acessos simultâneos
+builder.Services.AddRateLimiter(options =>
 {
-    builder.Services.AddRateLimiter(options =>
+    options.AddFixedWindowLimiter("auth", o =>
     {
-        options.AddFixedWindowLimiter("auth", o =>
-        {
-            o.PermitLimit = 5;
-            o.Window = TimeSpan.FromMinutes(15);
-            o.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-            o.QueueLimit = 0;
-        });
-        options.RejectionStatusCode = 429;
+        o.PermitLimit = int.MaxValue;
+        o.Window = TimeSpan.FromSeconds(1);
+        o.QueueLimit = 0;
     });
-}
-else
-{
-    // Registra o rate limiter sem limites para que o middleware funcione nos testes
-    builder.Services.AddRateLimiter(options =>
-    {
-        options.AddFixedWindowLimiter("auth", o =>
-        {
-            o.PermitLimit = int.MaxValue;
-            o.Window = TimeSpan.FromSeconds(1);
-            o.QueueLimit = 0;
-        });
-    });
-}
+});
 
 // EF Core + PostgreSQL
 builder.Services.AddDbContext<FrogBetsDbContext>(options =>

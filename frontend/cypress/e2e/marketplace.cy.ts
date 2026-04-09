@@ -4,18 +4,22 @@ const mockBets = [
   {
     id: 'mp-bet-1',
     marketId: 'mkt-1',
+    marketType: 'MapWinner',
+    mapNumber: 1,
+    gameId: 'game-1',
     creatorOption: 'TeamA',
     amount: 150,
     creatorId: 'other-user',
-    market: { type: 'MapWinner', mapNumber: 1, gameId: 'game-1' },
   },
   {
     id: 'mp-bet-2',
     marketId: 'mkt-2',
+    marketType: 'TopKills',
+    mapNumber: 2,
+    gameId: 'game-1',
     creatorOption: 'PlayerX',
     amount: 75,
     creatorId: 'other-user-2',
-    market: { type: 'TopKills', mapNumber: 2, gameId: 'game-1' },
   },
 ]
 

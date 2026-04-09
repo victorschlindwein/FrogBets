@@ -899,13 +899,13 @@ function MatchStatsSection({ games }: { games: Game[] }) {
   useEffect(() => {
     if (!statsGameId) { setMapResults([]); setMapResultId(''); setPlayers([]); return }
     setLoadingMaps(true); setMapResultId('')
-    Promise.all([
+    Promise.allSettled([
       getMapResultsByGame(statsGameId),
       getGamePlayers(statsGameId),
-    ])
-      .then(([maps, gamePlayers]) => { setMapResults(maps); setPlayers(gamePlayers) })
-      .catch(() => { setMapResults([]); setPlayers([]) })
-      .finally(() => setLoadingMaps(false))
+    ]).then(([mapsResult, playersResult]) => {
+      setMapResults(mapsResult.status === 'fulfilled' ? mapsResult.value : [])
+      setPlayers(playersResult.status === 'fulfilled' ? playersResult.value : [])
+    }).finally(() => setLoadingMaps(false))
   }, [statsGameId])
 
   async function handleSubmit(e: React.FormEvent) {

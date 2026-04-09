@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Build + Tests antes de entregar",
+  "description": "Roda npm run build e npm run test no frontend após o agente parar, garantindo que nada quebrou antes do commit.",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "cd frontend && npm run build && npm run test"
+  }
+}

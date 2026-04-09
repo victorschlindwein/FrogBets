@@ -165,7 +165,7 @@ describe('Preservation: MatchStatsSection — comportamento fora da bug conditio
 
     // Dropdown de Jogador deve estar populado
     await waitFor(() => {
-      expect(screen.getByText(/player1 - FURIA/i)).toBeInTheDocument()
+      expect(screen.getByText(/player1 — FURIA/i)).toBeInTheDocument()
     }, { timeout: 3000 })
   })
 

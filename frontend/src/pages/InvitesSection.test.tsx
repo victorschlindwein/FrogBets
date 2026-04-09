@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import AdminPage from './AdminPage'
@@ -24,11 +25,15 @@ beforeAll(() => server.listen())
 afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
+function renderAdminPage() {
+  return render(<MemoryRouter><AdminPage /></MemoryRouter>)
+}
+
 // ── Unit tests ────────────────────────────────────────────────────────────
 
 describe('InvitesSection — descrições individuais por convite', () => {
   it('exibe 1 input de descrição quando quantity = 1 (padrão)', async () => {
-    render(<AdminPage />)
+    renderAdminPage()
     await waitFor(() => {
       const inputs = screen.getAllByPlaceholderText('Nome ou identificação')
       expect(inputs).toHaveLength(1)
@@ -40,7 +45,7 @@ describe('InvitesSection — descrições individuais por convite', () => {
    * Validates: Requirements 6.1
    */
   it('exibe N inputs de descrição quando quantity > 1', async () => {
-    render(<AdminPage />)
+    renderAdminPage()
     const quantityInput = await screen.findByLabelText(/quantidade/i)
     fireEvent.change(quantityInput, { target: { value: '3' } })
     await waitFor(() => {
@@ -51,7 +56,7 @@ describe('InvitesSection — descrições individuais por convite', () => {
   })
 
   it('preserva valores existentes ao aumentar quantity', async () => {
-    render(<AdminPage />)
+    renderAdminPage()
     const quantityInput = await screen.findByLabelText(/quantidade/i)
 
     // Preenche o primeiro input com quantity=1
@@ -85,7 +90,7 @@ describe('InvitesSection — submit envia N POSTs com description individual', (
       })
     )
 
-    render(<AdminPage />)
+    renderAdminPage()
     const quantityInput = await screen.findByLabelText(/quantidade/i)
     fireEvent.change(quantityInput, { target: { value: '2' } })
 
@@ -116,7 +121,7 @@ describe('InvitesSection — submit envia N POSTs com description individual', (
       })
     )
 
-    render(<AdminPage />)
+    renderAdminPage()
     const submitBtn = await screen.findByRole('button', { name: /gerar convite/i })
     fireEvent.click(submitBtn)
 
@@ -143,7 +148,7 @@ describe('InvitesSection — exibição de tokens gerados', () => {
       })
     )
 
-    render(<AdminPage />)
+    renderAdminPage()
     const quantityInput = await screen.findByLabelText(/quantidade/i)
     fireEvent.change(quantityInput, { target: { value: '2' } })
 
@@ -167,7 +172,7 @@ describe('InvitesSection — reset após submit bem-sucedido', () => {
       )
     )
 
-    render(<AdminPage />)
+    renderAdminPage()
     const quantityInput = await screen.findByLabelText(/quantidade/i)
     fireEvent.change(quantityInput, { target: { value: '3' } })
 

@@ -144,14 +144,34 @@ export default function GameDetailPage() {
         {openMarkets.length === 0 ? (
           <div className="card empty-card"><p>Nenhum mercado disponível.</p></div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
-            {openMarkets.map(market => (
-              <div key={market.id} className="card">
-                <strong>{marketLabel(market)}</strong>
-                {canBet && <BetForm market={market} game={game} players={players} />}
+          <>
+            {openMarkets.some(m => TEAM_MARKETS.includes(m.type)) && (
+              <div style={{ marginBottom: '1.25rem' }}>
+                <h3 style={{ color: 'var(--text-muted)', fontSize: '.85rem', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: '.5rem' }}>🛡️ Apostas de Time</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
+                  {openMarkets.filter(m => TEAM_MARKETS.includes(m.type)).map(market => (
+                    <div key={market.id} className="card">
+                      <strong>{marketLabel(market)}</strong>
+                      {canBet && <BetForm market={market} game={game} players={players} />}
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
-          </div>
+            )}
+            {openMarkets.some(m => PLAYER_MARKETS.includes(m.type)) && (
+              <div>
+                <h3 style={{ color: 'var(--text-muted)', fontSize: '.85rem', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: '.5rem' }}>👤 Apostas de Jogador</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
+                  {openMarkets.filter(m => PLAYER_MARKETS.includes(m.type)).map(market => (
+                    <div key={market.id} className="card">
+                      <strong>{marketLabel(market)}</strong>
+                      {canBet && <BetForm market={market} game={game} players={players} />}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </section>
     </div>

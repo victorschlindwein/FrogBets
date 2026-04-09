@@ -1,0 +1,18 @@
+{
+  "enabled": true,
+  "name": "TypeScript Check on Save",
+  "description": "Roda tsc --noEmit no frontend sempre que um arquivo .ts ou .tsx é editado, para pegar erros de tipo antes do commit.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "frontend/src/**/*.ts",
+      "frontend/src/**/*.tsx"
+    ]
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "cd frontend && npx tsc --noEmit",
+    "timeout": 30
+  }
+}

@@ -8,6 +8,17 @@ interface Market {
   gameId: string
 }
 
+interface BetDtoResponse {
+  id: string
+  marketId: string
+  marketType: string
+  mapNumber: number | null
+  gameId: string
+  creatorOption: string
+  amount: number
+  creatorId: string
+}
+
 interface MarketplaceBet {
   id: string
   marketId: string
@@ -15,6 +26,21 @@ interface MarketplaceBet {
   amount: number
   creatorId: string
   market: Market
+}
+
+function mapDtoToMarketplaceBet(dto: BetDtoResponse): MarketplaceBet {
+  return {
+    id: dto.id,
+    marketId: dto.marketId,
+    creatorOption: dto.creatorOption,
+    amount: dto.amount,
+    creatorId: dto.creatorId,
+    market: {
+      type: dto.marketType,
+      mapNumber: dto.mapNumber,
+      gameId: dto.gameId,
+    },
+  }
 }
 
 interface TradeListingItem {
@@ -296,8 +322,8 @@ export default function MarketplacePage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    apiClient.get<MarketplaceBet[]>('/marketplace')
-      .then(res => setBets(res.data))
+    apiClient.get<BetDtoResponse[]>('/marketplace')
+      .then(res => setBets(res.data.map(mapDtoToMarketplaceBet)))
       .catch(() => setError('Erro ao carregar apostas disponíveis.'))
       .finally(() => setLoading(false))
   }, [])

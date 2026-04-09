@@ -131,12 +131,12 @@ public class GamesController : ControllerBase
             .Select(t => t.Id)
             .ToListAsync();
 
-        var players = await _db.Users
-            .Include(u => u.Team)
+        var players = await _db.CS2Players
+            .Include(p => p.Team)
             .AsNoTracking()
-            .Where(u => u.TeamId.HasValue && teamIds.Contains(u.TeamId.Value))
-            .OrderBy(u => u.Team!.Name).ThenBy(u => u.Username)
-            .Select(u => new { id = u.Id, nickname = u.Username, teamName = u.Team!.Name })
+            .Where(p => p.TeamId.HasValue && teamIds.Contains(p.TeamId.Value))
+            .OrderBy(p => p.Team!.Name).ThenBy(p => p.Nickname)
+            .Select(p => new { id = p.Id, nickname = p.Nickname, teamName = p.Team!.Name })
             .ToListAsync();
 
         return Ok(players);

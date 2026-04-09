@@ -9,15 +9,10 @@ using FrogBets.Tests.Integration;
 namespace FrogBets.Tests;
 
 /// <summary>
-/// Bug Condition Exploration Tests — Bug 2: CS2Players faltando no endpoint GET /api/games/{id}/players
+/// Tests for GET /api/games/{id}/players — endpoint now returns Users by TeamId.
 ///
-/// Validates: Requirements 1.3, 1.4
-///
-/// Estes testes confirmam o bug: o endpoint busca Users onde TeamId está nos times do jogo,
-/// mas CS2Players sem UserId vinculado ficam de fora.
-///
-/// EXPECTED OUTCOME: Testes FALHAM no código atual retornando apenas os usuários com TeamId
-/// (2 em vez de 4 CS2Players).
+/// After the register-result-players-dropdown feature, the endpoint queries Users
+/// (not CS2Players) whose TeamId matches one of the game's teams.
 /// </summary>
 public class MarketplacePlayerBugConditionTests : IClassFixture<IntegrationTestFactory>
 {
@@ -38,39 +33,20 @@ public class MarketplacePlayerBugConditionTests : IClassFixture<IntegrationTestF
     }
 
     /// <summary>
-    /// Bug Condition: jogo com 4 CS2Players (2 por time, 1 com UserId=null por time)
-    /// deve retornar todos os 4 jogadores.
-    ///
-    /// EXPECTED OUTCOME no código atual: retorna apenas 2 (os que têm UserId vinculado),
-    /// ignorando os 2 CS2Players com UserId=null.
-    ///
-    /// Counterexample: response.Count == 2 quando deveria ser 4.
+    /// Endpoint returns all Users whose TeamId belongs to the game's teams.
     /// </summary>
     [Fact]
-    public async Task GetGamePlayers_WithCS2PlayersWithoutUserId_ReturnsAllFourPlayers()
+    public async Task GetGamePlayers_WithUsersInTeams_ReturnsAllFourPlayers()
     {
         using var db = _factory.CreateDbContext();
 
-        // Seed: usuário autenticado
         var authUser = await IntegrationTestFactory.SeedUserAsync(db, "auth_user_bugcond");
         AuthAs(authUser.Id, authUser.Username);
 
-        // Seed: dois times CS2
-        var teamA = new CS2Team
-        {
-            Id        = Guid.NewGuid(),
-            Name      = "TeamAlpha",
-            CreatedAt = DateTime.UtcNow,
-        };
-        var teamB = new CS2Team
-        {
-            Id        = Guid.NewGuid(),
-            Name      = "TeamBeta",
-            CreatedAt = DateTime.UtcNow,
-        };
+        var teamA = new CS2Team { Id = Guid.NewGuid(), Name = "TeamAlpha_v2", CreatedAt = DateTime.UtcNow };
+        var teamB = new CS2Team { Id = Guid.NewGuid(), Name = "TeamBeta_v2", CreatedAt = DateTime.UtcNow };
         db.CS2Teams.AddRange(teamA, teamB);
 
-        // Seed: jogo com os dois times
         var game = new Game
         {
             Id           = Guid.NewGuid(),
@@ -83,106 +59,38 @@ public class MarketplacePlayerBugConditionTests : IClassFixture<IntegrationTestF
         };
         db.Games.Add(game);
 
-        // Seed: 2 CS2Players em TeamA
-        // Player 1: com UserId vinculado (User com TeamId)
-        var userA1 = new User
-        {
-            Id              = Guid.NewGuid(),
-            Username        = "player_a1_user",
-            PasswordHash    = "hash",
-            VirtualBalance  = 1000m,
-            ReservedBalance = 0m,
-            TeamId          = teamA.Id,
-            CreatedAt       = DateTime.UtcNow,
-        };
-        db.Users.Add(userA1);
-
-        var playerA1 = new CS2Player
-        {
-            Id        = Guid.NewGuid(),
-            TeamId    = teamA.Id,
-            Nickname  = "PlayerA1",
-            UserId    = userA1.Id,
-            CreatedAt = DateTime.UtcNow,
-        };
-
-        // Player 2: sem UserId (CS2Player puro, sem User correspondente)
-        var playerA2 = new CS2Player
-        {
-            Id        = Guid.NewGuid(),
-            TeamId    = teamA.Id,
-            Nickname  = "PlayerA2",
-            UserId    = null, // Bug condition: sem UserId
-            CreatedAt = DateTime.UtcNow,
-        };
-
-        // Seed: 2 CS2Players em TeamB
-        // Player 3: com UserId vinculado
-        var userB1 = new User
-        {
-            Id              = Guid.NewGuid(),
-            Username        = "player_b1_user",
-            PasswordHash    = "hash",
-            VirtualBalance  = 1000m,
-            ReservedBalance = 0m,
-            TeamId          = teamB.Id,
-            CreatedAt       = DateTime.UtcNow,
-        };
-        db.Users.Add(userB1);
-
-        var playerB1 = new CS2Player
-        {
-            Id        = Guid.NewGuid(),
-            TeamId    = teamB.Id,
-            Nickname  = "PlayerB1",
-            UserId    = userB1.Id,
-            CreatedAt = DateTime.UtcNow,
-        };
-
-        // Player 4: sem UserId (CS2Player puro, sem User correspondente)
-        var playerB2 = new CS2Player
-        {
-            Id        = Guid.NewGuid(),
-            TeamId    = teamB.Id,
-            Nickname  = "PlayerB2",
-            UserId    = null, // Bug condition: sem UserId
-            CreatedAt = DateTime.UtcNow,
-        };
-
-        db.CS2Players.AddRange(playerA1, playerA2, playerB1, playerB2);
+        // 2 users in TeamA, 2 users in TeamB
+        var userA1 = new User { Id = Guid.NewGuid(), Username = "player_a1_user", PasswordHash = "hash", VirtualBalance = 1000m, ReservedBalance = 0m, TeamId = teamA.Id, CreatedAt = DateTime.UtcNow };
+        var userA2 = new User { Id = Guid.NewGuid(), Username = "player_a2_user", PasswordHash = "hash", VirtualBalance = 1000m, ReservedBalance = 0m, TeamId = teamA.Id, CreatedAt = DateTime.UtcNow };
+        var userB1 = new User { Id = Guid.NewGuid(), Username = "player_b1_user", PasswordHash = "hash", VirtualBalance = 1000m, ReservedBalance = 0m, TeamId = teamB.Id, CreatedAt = DateTime.UtcNow };
+        var userB2 = new User { Id = Guid.NewGuid(), Username = "player_b2_user", PasswordHash = "hash", VirtualBalance = 1000m, ReservedBalance = 0m, TeamId = teamB.Id, CreatedAt = DateTime.UtcNow };
+        db.Users.AddRange(userA1, userA2, userB1, userB2);
         await db.SaveChangesAsync();
 
-        // Act
         var response = await _client.GetAsync($"/api/games/{game.Id}/players");
 
-        // Assert: deve retornar 200
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
         var body = await response.Content.ReadAsStringAsync();
 
-        // Assert: deve conter todos os 4 CS2Players
-        // Bug: no código atual, retorna apenas 2 (PlayerA1 e PlayerB1, que têm UserId)
-        // Counterexample: body contém apenas 2 jogadores em vez de 4
-        Assert.Contains("PlayerA1", body);
-        Assert.Contains("PlayerA2", body); // FALHA no código atual — CS2Player sem UserId
-        Assert.Contains("PlayerB1", body);
-        Assert.Contains("PlayerB2", body); // FALHA no código atual — CS2Player sem UserId
+        Assert.Contains("player_a1_user", body);
+        Assert.Contains("player_a2_user", body);
+        Assert.Contains("player_b1_user", body);
+        Assert.Contains("player_b2_user", body);
     }
 
     /// <summary>
-    /// Bug Condition: verifica que a contagem de jogadores retornados é exatamente 4.
-    /// Confirma que o bug resulta em contagem incorreta (2 em vez de 4).
+    /// Endpoint returns exactly 4 users when 2 users per team are in the game's teams.
     /// </summary>
     [Fact]
-    public async Task GetGamePlayers_WithCS2PlayersWithoutUserId_CountIsExactlyFour()
+    public async Task GetGamePlayers_WithUsersInTeams_CountIsExactlyFour()
     {
         using var db = _factory.CreateDbContext();
 
-        var authUser = await IntegrationTestFactory.SeedUserAsync(db, "auth_user_count");
+        var authUser = await IntegrationTestFactory.SeedUserAsync(db, "auth_user_count_v2");
         AuthAs(authUser.Id, authUser.Username);
 
-        var teamA = new CS2Team { Id = Guid.NewGuid(), Name = "CountTeamA", CreatedAt = DateTime.UtcNow };
-        var teamB = new CS2Team { Id = Guid.NewGuid(), Name = "CountTeamB", CreatedAt = DateTime.UtcNow };
+        var teamA = new CS2Team { Id = Guid.NewGuid(), Name = "CountTeamA_v2", CreatedAt = DateTime.UtcNow };
+        var teamB = new CS2Team { Id = Guid.NewGuid(), Name = "CountTeamB_v2", CreatedAt = DateTime.UtcNow };
         db.CS2Teams.AddRange(teamA, teamB);
 
         var game = new Game
@@ -197,17 +105,11 @@ public class MarketplacePlayerBugConditionTests : IClassFixture<IntegrationTestF
         };
         db.Games.Add(game);
 
-        // 2 users com TeamId (para simular o comportamento atual da query bugada)
-        var userA = new User { Id = Guid.NewGuid(), Username = "cnt_ua", PasswordHash = "h", VirtualBalance = 100m, ReservedBalance = 0m, TeamId = teamA.Id, CreatedAt = DateTime.UtcNow };
-        var userB = new User { Id = Guid.NewGuid(), Username = "cnt_ub", PasswordHash = "h", VirtualBalance = 100m, ReservedBalance = 0m, TeamId = teamB.Id, CreatedAt = DateTime.UtcNow };
-        db.Users.AddRange(userA, userB);
-
-        // 4 CS2Players: 1 com UserId por time, 1 sem UserId por time
-        db.CS2Players.AddRange(
-            new CS2Player { Id = Guid.NewGuid(), TeamId = teamA.Id, Nickname = "CntA1", UserId = userA.Id, CreatedAt = DateTime.UtcNow },
-            new CS2Player { Id = Guid.NewGuid(), TeamId = teamA.Id, Nickname = "CntA2", UserId = null, CreatedAt = DateTime.UtcNow },
-            new CS2Player { Id = Guid.NewGuid(), TeamId = teamB.Id, Nickname = "CntB1", UserId = userB.Id, CreatedAt = DateTime.UtcNow },
-            new CS2Player { Id = Guid.NewGuid(), TeamId = teamB.Id, Nickname = "CntB2", UserId = null, CreatedAt = DateTime.UtcNow }
+        db.Users.AddRange(
+            new User { Id = Guid.NewGuid(), Username = "cnt_ua1", PasswordHash = "h", VirtualBalance = 100m, ReservedBalance = 0m, TeamId = teamA.Id, CreatedAt = DateTime.UtcNow },
+            new User { Id = Guid.NewGuid(), Username = "cnt_ua2", PasswordHash = "h", VirtualBalance = 100m, ReservedBalance = 0m, TeamId = teamA.Id, CreatedAt = DateTime.UtcNow },
+            new User { Id = Guid.NewGuid(), Username = "cnt_ub1", PasswordHash = "h", VirtualBalance = 100m, ReservedBalance = 0m, TeamId = teamB.Id, CreatedAt = DateTime.UtcNow },
+            new User { Id = Guid.NewGuid(), Username = "cnt_ub2", PasswordHash = "h", VirtualBalance = 100m, ReservedBalance = 0m, TeamId = teamB.Id, CreatedAt = DateTime.UtcNow }
         );
         await db.SaveChangesAsync();
 
@@ -216,12 +118,8 @@ public class MarketplacePlayerBugConditionTests : IClassFixture<IntegrationTestF
 
         var players = await response.Content.ReadFromJsonAsync<List<PlayerDto>>();
         Assert.NotNull(players);
-
-        // Bug condition: no código atual retorna 2 (apenas Users com TeamId)
-        // Comportamento esperado: retorna 4 (todos os CS2Players dos times)
-        // EXPECTED OUTCOME: este Assert FALHA no código atual (players.Count == 2, não 4)
         Assert.Equal(4, players!.Count);
     }
 
-    private record PlayerDto(Guid id, string nickname, string teamName);
+    private record PlayerDto(Guid id, string username, string teamName);
 }

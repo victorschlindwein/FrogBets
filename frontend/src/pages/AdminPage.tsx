@@ -345,24 +345,52 @@ function StartGameSection({ games, onStarted }: { games: Game[]; onStarted: () =
 function RegisterResultSection({ games }: { games: Game[] }) {
   const [selectedGameId, setSelectedGameId] = useState('')
   const [markets, setMarkets] = useState<Market[]>([])
+  const [gamePlayers, setGamePlayers] = useState<import('../api/players').GamePlayer[]>([])
   const [results, setResults] = useState<Record<string, string>>({})
   const [loadingMarkets, setLoadingMarkets] = useState(false)
+  const [loadingPlayers, setLoadingPlayers] = useState(false)
+  const [playersError, setPlayersError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const activeGames = games.filter(g => g.status === 'InProgress')
 
+  const PLAYER_MARKETS = ['TopKills', 'MostDeaths', 'MostUtilityDamage']
+  const MARKET_ORDER: Record<string, number> = {
+    MapWinner: 0, SeriesWinner: 1, TopKills: 2, MostDeaths: 3, MostUtilityDamage: 4,
+  }
+
+  function sortMarkets(ms: Market[]): Market[] {
+    return [...ms].sort((a, b) => {
+      const typeDiff = (MARKET_ORDER[a.type] ?? 99) - (MARKET_ORDER[b.type] ?? 99)
+      if (typeDiff !== 0) return typeDiff
+      return (a.mapNumber ?? 0) - (b.mapNumber ?? 0)
+    })
+  }
+
   useEffect(() => {
-    if (!selectedGameId) { setMarkets([]); setResults({}); return }
+    if (!selectedGameId) {
+      setMarkets([]); setResults({}); setGamePlayers([]); setPlayersError(null); return
+    }
     setLoadingMarkets(true)
+    setLoadingPlayers(true)
+    setPlayersError(null)
+
     apiClient.get<Game>(`/games/${selectedGameId}`)
       .then(res => {
-        const open = (res.data.markets ?? []).filter(m => m.status === 'Closed')
-        setMarkets(open)
-        setResults(Object.fromEntries(open.map(m => [m.id, ''])))
+        const closed = sortMarkets((res.data.markets ?? []).filter(m => m.status === 'Closed'))
+        setMarkets(closed)
+        setResults(Object.fromEntries(closed.map(m => [m.id, ''])))
       })
       .catch(() => setMarkets([]))
       .finally(() => setLoadingMarkets(false))
+
+    import('../api/players').then(({ getGamePlayers }) =>
+      getGamePlayers(selectedGameId)
+        .then(setGamePlayers)
+        .catch(() => setPlayersError('Erro ao carregar jogadores.'))
+        .finally(() => setLoadingPlayers(false))
+    )
   }, [selectedGameId])
 
   async function handleSubmit(e: React.FormEvent) {
@@ -378,7 +406,7 @@ function RegisterResultSection({ games }: { games: Game[] }) {
         })
       ))
       setSuccess(`${pending.length} resultado(s) registrado(s) com sucesso!`)
-      setSelectedGameId(''); setMarkets([]); setResults({})
+      setSelectedGameId(''); setMarkets([]); setResults({}); setGamePlayers([])
     } catch (err: unknown) {
       const e2 = err as { response?: { data?: { error?: { message?: string } } } }
       setError(e2.response?.data?.error?.message ?? 'Erro ao registrar resultado.')
@@ -405,13 +433,17 @@ function RegisterResultSection({ games }: { games: Game[] }) {
               </select>
             </div>
 
-            {loadingMarkets && <p style={{ color: 'var(--text-muted)' }}>Carregando mercados...</p>}
+            {(loadingMarkets || loadingPlayers) && <p style={{ color: 'var(--text-muted)' }}>Carregando...</p>}
 
-            {!loadingMarkets && selectedGameId && markets.length === 0 && (
-              <p style={{ color: 'var(--text-muted)' }}>Nenhum mercado aberto para este jogo.</p>
+            {!loadingMarkets && !loadingPlayers && selectedGameId && markets.length === 0 && (
+              <p style={{ color: 'var(--text-muted)' }}>Nenhum mercado fechado para este jogo.</p>
             )}
 
-            {!loadingMarkets && markets.length > 0 && (
+            {playersError && (
+              <p role="alert" style={{ color: 'var(--danger)' }}>{playersError}</p>
+            )}
+
+            {!loadingMarkets && !loadingPlayers && markets.length > 0 && (
               <>
                 <p style={{ fontSize: '.85rem', color: 'var(--text-muted)', marginBottom: '.75rem' }}>
                   Preencha a opção vencedora para cada mercado. Deixe em branco para pular.
@@ -419,22 +451,33 @@ function RegisterResultSection({ games }: { games: Game[] }) {
                 {markets.map(m => (
                   <div className="form-group" key={m.id}>
                     <label>{marketLabel(m)}</label>
-                    {['MapWinner', 'SeriesWinner'].includes(m.type) ? (
+                    {PLAYER_MARKETS.includes(m.type) ? (
+                      <select
+                        value={results[m.id] ?? ''}
+                        onChange={e => setResults(r => ({ ...r, [m.id]: e.target.value }))}
+                        disabled={gamePlayers.length === 0}
+                      >
+                        <option value="">— pular —</option>
+                        {gamePlayers.map(p => (
+                          <option key={p.id} value={p.username}>
+                            {p.username} ({p.teamName})
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
                       <select value={results[m.id] ?? ''} onChange={e => setResults(r => ({ ...r, [m.id]: e.target.value }))}>
                         <option value="">— pular —</option>
                         <option value={selectedGame?.teamA}>{selectedGame?.teamA}</option>
                         <option value={selectedGame?.teamB}>{selectedGame?.teamB}</option>
                       </select>
-                    ) : (
-                      <input
-                        type="text"
-                        placeholder="Nome do jogador ou deixe em branco"
-                        value={results[m.id] ?? ''}
-                        onChange={e => setResults(r => ({ ...r, [m.id]: e.target.value }))}
-                      />
                     )}
                   </div>
                 ))}
+                {!loadingPlayers && gamePlayers.length === 0 && !playersError && (
+                  <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>
+                    Nenhum jogador encontrado para este jogo — mercados de jogador desabilitados.
+                  </p>
+                )}
                 <button type="submit" disabled={submitting}>{submitting ? 'Registrando...' : 'Registrar Resultados'}</button>
               </>
             )}

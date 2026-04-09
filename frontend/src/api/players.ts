@@ -94,7 +94,7 @@ export const getPlayerStats = (playerId: string): Promise<MatchStatsDto[]> =>
 
 export interface GamePlayer {
   id: string;
-  nickname: string;
+  username: string;
   teamName: string;
 }
 

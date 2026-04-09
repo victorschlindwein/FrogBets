@@ -116,7 +116,7 @@ public class GamesController : ControllerBase
         }
     }
 
-    /// <summary>GET /api/games/{id}/players — authenticated: list players from both teams of the game.</summary>
+    /// <summary>GET /api/games/{id}/players — authenticated: list users from both teams of the game.</summary>
     [HttpGet("{id:guid}/players")]
     [Authorize]
     public async Task<IActionResult> GetGamePlayers(Guid id)
@@ -127,16 +127,16 @@ public class GamesController : ControllerBase
 
         var teamIds = await _db.CS2Teams
             .AsNoTracking()
-            .Where(t => t.Name == game.TeamA || t.Name == game.TeamB)
+            .Where(t => (t.Name == game.TeamA || t.Name == game.TeamB) && !t.IsDeleted)
             .Select(t => t.Id)
             .ToListAsync();
 
-        var players = await _db.CS2Players
-            .Include(p => p.Team)
+        var players = await _db.Users
+            .Include(u => u.Team)
             .AsNoTracking()
-            .Where(p => p.TeamId.HasValue && teamIds.Contains(p.TeamId.Value))
-            .OrderBy(p => p.Team!.Name).ThenBy(p => p.Nickname)
-            .Select(p => new { id = p.Id, nickname = p.Nickname, teamName = p.Team!.Name })
+            .Where(u => u.TeamId.HasValue && teamIds.Contains(u.TeamId.Value))
+            .OrderBy(u => u.Team!.Name).ThenBy(u => u.Username)
+            .Select(u => new { id = u.Id, username = u.Username, teamName = u.Team!.Name })
             .ToListAsync();
 
         return Ok(players);

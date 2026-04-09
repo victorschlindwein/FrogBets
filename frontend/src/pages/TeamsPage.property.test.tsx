@@ -5,18 +5,19 @@ import { setupServer } from 'msw/node'
 import { MemoryRouter } from 'react-router-dom'
 import * as fc from 'fast-check'
 import TeamsPage, { groupPlayersByTeam } from './TeamsPage'
+import { safeString, safeId } from '../test/fc-helpers'
 
 // ── Arbitrários base ──────────────────────────────────────────────────────────
 const arbTeam = fc.record({
-  id: fc.uuid(),
-  name: fc.string({ minLength: 1, maxLength: 20 }).filter(s => s.trim().length > 0 && s === s.trim()),
+  id: safeId(),
+  name: safeString({ minLength: 1, maxLength: 20 }),
   logoUrl: fc.option(fc.constant('https://example.com/logo.png'), { nil: null }),
   createdAt: fc.constant('2024-01-01'),
 })
 
 const arbMember = fc.record({
-  id: fc.uuid(),
-  username: fc.string({ minLength: 1, maxLength: 15 }).filter(s => s.trim().length > 0 && s === s.trim()),
+  id: safeId(),
+  username: safeString({ minLength: 1, maxLength: 15 }),
   isTeamLeader: fc.boolean(),
 })
 

@@ -14,15 +14,6 @@ interface Game {
   numberOfMaps: number; status: 'Scheduled' | 'InProgress' | 'Finished'; markets?: Market[]
 }
 
-const MARKET_TYPE_LABELS: Record<string, string> = {
-  MapWinner: 'Vencedor do Mapa', SeriesWinner: 'Vencedor da Série',
-  TopKills: 'Top Kills', MostDeaths: 'Mais Mortes', MostUtilityDamage: 'Maior Dano por Utilitários',
-}
-function marketLabel(m: Market) {
-  const t = MARKET_TYPE_LABELS[m.type] ?? m.type
-  return m.mapNumber != null ? `${t} — Mapa ${m.mapNumber}` : t
-}
-
 // ── Índice de navegação ───────────────────────────────────────────────────
 const NAV_ITEMS_BASE = [
   { id: 'sec-users',       label: '👥 Usuários' },

@@ -171,10 +171,10 @@ public class BetServiceCoverTests
     // ── Opposite option — team markets ────────────────────────────────────────
 
     [Theory]
-    [InlineData(MarketType.MapWinner, "TeamA", "TeamB")]
-    [InlineData(MarketType.MapWinner, "TeamB", "TeamA")]
-    [InlineData(MarketType.SeriesWinner, "TeamA", "TeamB")]
-    [InlineData(MarketType.SeriesWinner, "TeamB", "TeamA")]
+    [InlineData(MarketType.MapWinner, "Team A", "Team B")]
+    [InlineData(MarketType.MapWinner, "Team B", "Team A")]
+    [InlineData(MarketType.SeriesWinner, "Team A", "Team B")]
+    [InlineData(MarketType.SeriesWinner, "Team B", "Team A")]
     public async Task CoverBet_TeamMarket_AssignsOppositeTeamOption(
         MarketType marketType, string creatorOption, string expectedCovererOption)
     {

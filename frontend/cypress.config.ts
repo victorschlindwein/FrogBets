@@ -9,6 +9,8 @@ export default defineConfig({
     screenshotOnRunFailure: true,
     env: {
       apiUrl: 'http://localhost:8080',
+      adminUsername: 'admin',
+      adminPassword: 'admin123456',
     },
   },
 })

@@ -38,12 +38,14 @@ public class UsersController : ControllerBase
 
         return Ok(new
         {
-            id           = user.Id,
-            username     = user.Username,
-            isAdmin      = user.IsAdmin,
-            isTeamLeader = user.IsTeamLeader,
-            teamId       = user.TeamId,
-            createdAt    = user.CreatedAt,
+            id            = user.Id,
+            username      = user.Username,
+            isAdmin       = user.IsAdmin,
+            isTeamLeader  = user.IsTeamLeader,
+            teamId        = user.TeamId,
+            createdAt     = user.CreatedAt,
+            winsCount     = user.WinsCount,
+            lossesCount   = user.LossesCount,
             isMasterAdmin = !string.IsNullOrEmpty(_masterAdminUsername) &&
                             user.Username.Equals(_masterAdminUsername, StringComparison.OrdinalIgnoreCase),
         });

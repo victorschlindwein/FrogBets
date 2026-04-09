@@ -70,9 +70,10 @@ public class BetService : IBetService
         await using var tx = await _db.Database.BeginTransactionAsync(
             System.Data.IsolationLevel.Serializable);
 
-        // Load bet with its market (needed for opposite-option logic)
+        // Load bet with its market and game (needed for opposite-option logic)
         var bet = await _db.Bets
             .Include(b => b.Market)
+                .ThenInclude(m => m.Game)
             .FirstOrDefaultAsync(b => b.Id == betId)
             ?? throw new KeyNotFoundException($"Bet {betId} not found.");
 
@@ -85,7 +86,7 @@ public class BetService : IBetService
             throw new InvalidOperationException("BET_NOT_AVAILABLE");
 
         // Determine the opposite option for the coverer
-        var covererOption = GetOppositeOption(bet.Market.Type, bet.CreatorOption);
+        var covererOption = GetOppositeOption(bet.Market.Type, bet.CreatorOption, bet.Market.Game);
 
         // Reserve coverer's balance — throws INSUFFICIENT_BALANCE if not enough
         await _balanceService.ReserveBalanceAsync(coverId, bet.Amount);
@@ -133,11 +134,12 @@ public class BetService : IBetService
 
     // ── helpers ───────────────────────────────────────────────────────────────
 
-    private static string GetOppositeOption(MarketType marketType, string creatorOption)
+    private static string GetOppositeOption(MarketType marketType, string creatorOption, FrogBets.Domain.Entities.Game game)
     {
         if (marketType is MarketType.MapWinner or MarketType.SeriesWinner)
         {
-            return creatorOption == "TeamA" ? "TeamB" : "TeamA";
+            // Use the actual team names from the game
+            return creatorOption == game.TeamA ? game.TeamB : game.TeamA;
         }
         // For player-based markets, prefix with NOT_
         return creatorOption.StartsWith("NOT_")

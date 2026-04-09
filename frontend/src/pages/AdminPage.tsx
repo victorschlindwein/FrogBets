@@ -357,7 +357,7 @@ function RegisterResultSection({ games }: { games: Game[] }) {
     setLoadingMarkets(true)
     apiClient.get<Game>(`/games/${selectedGameId}`)
       .then(res => {
-        const open = (res.data.markets ?? []).filter(m => m.status === 'Open')
+        const open = (res.data.markets ?? []).filter(m => m.status === 'Closed')
         setMarkets(open)
         setResults(Object.fromEntries(open.map(m => [m.id, ''])))
       })

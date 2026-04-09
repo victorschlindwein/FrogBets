@@ -77,8 +77,8 @@ function BetForm({ market, game, players }: { market: Market; game: Game; player
           <select id={`option-${market.id}`} value={option} onChange={e => setOption(e.target.value)} required>
             <option value="">Selecione um jogador</option>
             {players.map(p => (
-              <option key={`${p.nickname}-${p.teamName}`} value={p.nickname}>
-                {p.nickname} - {p.teamName}
+              <option key={`${p.username}-${p.teamName}`} value={p.username}>
+                {p.username} - {p.teamName}
               </option>
             ))}
           </select>

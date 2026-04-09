@@ -875,7 +875,7 @@ function MapResultSection({ games }: { games: Game[] }) {
 
 // ── Estatísticas de Partida ───────────────────────────────────────────────
 function MatchStatsSection({ games }: { games: Game[] }) {
-  const [players, setPlayers] = useState<{ id: string; nickname: string; teamName: string }[]>([])
+  const [players, setPlayers] = useState<{ id: string; username: string; teamName: string }[]>([])
 
   // Etapa 1: selecionar jogo
   const [statsGameId, setStatsGameId] = useState('')
@@ -970,7 +970,7 @@ function MatchStatsSection({ games }: { games: Game[] }) {
                 <label htmlFor="statsPlayerSelect">Jogador:</label>
                 <select id="statsPlayerSelect" value={playerId} onChange={e => setPlayerId(e.target.value)} required>
                   <option value="">Selecione um jogador</option>
-                  {players.map(p => <option key={p.id} value={p.id}>{p.nickname} - {p.teamName}</option>)}
+                  {players.map(p => <option key={p.id} value={p.id}>{p.username} - {p.teamName}</option>)}
                 </select>
               </div>
               {[

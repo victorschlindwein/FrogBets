@@ -9,7 +9,7 @@ import TeamsPage, { groupPlayersByTeam } from './TeamsPage'
 // ── Arbitrários base ──────────────────────────────────────────────────────────
 const arbTeam = fc.record({
   id: fc.uuid(),
-  name: fc.string({ minLength: 1, maxLength: 20 }).filter(s => /\S/.test(s)),
+  name: fc.string({ minLength: 1, maxLength: 20 }).filter(s => s.trim().length > 0 && s === s.trim()),
   logoUrl: fc.option(fc.constant('https://example.com/logo.png'), { nil: null }),
   createdAt: fc.constant('2024-01-01'),
 })

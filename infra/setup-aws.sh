@@ -126,7 +126,7 @@ if [ -z "$RDS_EXISTS" ] || [ "$RDS_EXISTS" = "None" ]; then
     --storage-type gp2 \
     --vpc-security-group-ids "$RDS_SG" \
     --no-publicly-accessible \
-    --backup-retention-period 0 \
+    --backup-retention-period 7 \
     --region "$AWS_REGION" \
     --output text > /dev/null
   echo "    RDS criado, aguardando ficar disponível (~5 min)..."

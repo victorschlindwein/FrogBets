@@ -148,8 +148,10 @@ public class BetService : IBetService
         }
         else
         {
-            // For player-based markets, validate against known player nicknames
-            var playerExists = await _db.CS2Players.AnyAsync(p => p.Nickname == option);
+            // For player-based markets, validate against known player nicknames.
+            // Strip NOT_ prefix so users can bet against a player (e.g. NOT_player1).
+            var nickname = option.StartsWith("NOT_") ? option[4..] : option;
+            var playerExists = await _db.CS2Players.AnyAsync(p => p.Nickname == nickname);
             if (!playerExists)
                 throw new InvalidOperationException("INVALID_BET_OPTION");
         }

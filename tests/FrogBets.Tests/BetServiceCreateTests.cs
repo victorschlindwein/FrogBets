@@ -287,4 +287,159 @@ public class BetServiceCreateTests
         await Assert.ThrowsAsync<KeyNotFoundException>(
             () => svc.CreateBetAsync(user.Id, Guid.NewGuid(), "Team A", 100m));
     }
+
+    // ── Option validation — player-based markets ──────────────────────────────
+
+    private static async Task<(Game game, Market market, CS2Player player)> SeedPlayerMarketAsync(
+        FrogBetsDbContext db,
+        MarketType marketType = MarketType.TopKills)
+    {
+        var team = new CS2Team
+        {
+            Id        = Guid.NewGuid(),
+            Name      = "TestTeam",
+            CreatedAt = DateTime.UtcNow,
+        };
+
+        var player = new CS2Player
+        {
+            Id        = Guid.NewGuid(),
+            TeamId    = team.Id,
+            Nickname  = "sniper99",
+            CreatedAt = DateTime.UtcNow,
+        };
+        team.Players.Add(player);
+        db.CS2Teams.Add(team);
+
+        var game = new Game
+        {
+            Id           = Guid.NewGuid(),
+            TeamA        = "Team A",
+            TeamB        = "Team B",
+            ScheduledAt  = DateTime.UtcNow.AddDays(1),
+            NumberOfMaps = 1,
+            Status       = GameStatus.Scheduled,
+            CreatedAt    = DateTime.UtcNow,
+        };
+
+        var market = new Market
+        {
+            Id        = Guid.NewGuid(),
+            GameId    = game.Id,
+            Type      = marketType,
+            MapNumber = 1,
+            Status    = MarketStatus.Open,
+            Game      = game,
+        };
+
+        game.Markets.Add(market);
+        db.Games.Add(game);
+        await db.SaveChangesAsync();
+
+        return (game, market, player);
+    }
+
+    [Theory]
+    [InlineData(MarketType.TopKills)]
+    [InlineData(MarketType.MostDeaths)]
+    [InlineData(MarketType.MostUtilityDamage)]
+    public async Task CreateBet_PlayerMarket_PlainPlayerName_Succeeds(MarketType marketType)
+    {
+        await using var db = CreateDb();
+        var user = await SeedUserAsync(db, 500m);
+        var (_, market, player) = await SeedPlayerMarketAsync(db, marketType);
+        var svc = CreateService(db);
+
+        var betId = await svc.CreateBetAsync(user.Id, market.Id, player.Nickname, 100m);
+
+        Assert.NotEqual(Guid.Empty, betId);
+    }
+
+    [Theory]
+    [InlineData(MarketType.TopKills)]
+    [InlineData(MarketType.MostDeaths)]
+    [InlineData(MarketType.MostUtilityDamage)]
+    public async Task CreateBet_PlayerMarket_NotPrefixedOption_Succeeds(MarketType marketType)
+    {
+        // Regression test for H-1: NOT_-prefixed options must be accepted for player markets.
+        await using var db = CreateDb();
+        var user = await SeedUserAsync(db, 500m);
+        var (_, market, player) = await SeedPlayerMarketAsync(db, marketType);
+        var svc = CreateService(db);
+
+        var betId = await svc.CreateBetAsync(user.Id, market.Id, "NOT_" + player.Nickname, 100m);
+
+        Assert.NotEqual(Guid.Empty, betId);
+    }
+
+    [Fact]
+    public async Task CreateBet_PlayerMarket_UnknownPlayer_ThrowsInvalidBetOption()
+    {
+        await using var db = CreateDb();
+        var user = await SeedUserAsync(db, 500m);
+        var (_, market, _) = await SeedPlayerMarketAsync(db);
+        var svc = CreateService(db);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.CreateBetAsync(user.Id, market.Id, "nobody", 100m));
+
+        Assert.Equal("INVALID_BET_OPTION", ex.Message);
+    }
+
+    [Fact]
+    public async Task CreateBet_PlayerMarket_NotPrefixedUnknownPlayer_ThrowsInvalidBetOption()
+    {
+        await using var db = CreateDb();
+        var user = await SeedUserAsync(db, 500m);
+        var (_, market, _) = await SeedPlayerMarketAsync(db);
+        var svc = CreateService(db);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.CreateBetAsync(user.Id, market.Id, "NOT_nobody", 100m));
+
+        Assert.Equal("INVALID_BET_OPTION", ex.Message);
+    }
+
+    [Fact]
+    public async Task CreateBet_PlayerMarket_EmptyOption_ThrowsInvalidBetOption()
+    {
+        await using var db = CreateDb();
+        var user = await SeedUserAsync(db, 500m);
+        var (_, market, _) = await SeedPlayerMarketAsync(db);
+        var svc = CreateService(db);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.CreateBetAsync(user.Id, market.Id, "", 100m));
+
+        Assert.Equal("INVALID_BET_OPTION", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("TeamA")]
+    [InlineData("TeamB")]
+    public async Task CreateBet_TeamWinnerMarket_ValidTeamOption_Succeeds(string option)
+    {
+        await using var db = CreateDb();
+        var user = await SeedUserAsync(db, 500m);
+        var (_, market) = await SeedGameWithMarketAsync(db, marketStatus: MarketStatus.Open);
+        var svc = CreateService(db);
+
+        var betId = await svc.CreateBetAsync(user.Id, market.Id, option, 100m);
+
+        Assert.NotEqual(Guid.Empty, betId);
+    }
+
+    [Fact]
+    public async Task CreateBet_TeamWinnerMarket_InvalidOption_ThrowsInvalidBetOption()
+    {
+        await using var db = CreateDb();
+        var user = await SeedUserAsync(db, 500m);
+        var (_, market) = await SeedGameWithMarketAsync(db, marketStatus: MarketStatus.Open);
+        var svc = CreateService(db);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.CreateBetAsync(user.Id, market.Id, "TeamC", 100m));
+
+        Assert.Equal("INVALID_BET_OPTION", ex.Message);
+    }
 }
